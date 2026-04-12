@@ -30,14 +30,21 @@ class AgentConfig:
 
 
 def load_global_config(path: str) -> GlobalConfig:
-    with open(path) as f:
-        data = yaml.safe_load(f)
+    try:
+        with open(path) as f:
+            data = yaml.safe_load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Global config file not found: {path}")
+    except yaml.YAMLError as exc:
+        raise ValueError(f"Failed to parse global config '{path}': {exc}")
+    if not isinstance(data, dict):
+        raise ValueError(f"Global config '{path}' must be a mapping at the top level")
     if not data.get("default_model"):
-        raise ValueError(f"global config missing required field: default_model")
+        raise ValueError("global config missing required field: default_model")
     if not data.get("environments_config"):
-        raise ValueError(f"global config missing required field: environments_config")
+        raise ValueError("global config missing required field: environments_config")
     if not data.get("agents_config"):
-        raise ValueError(f"global config missing required field: agents_config")
+        raise ValueError("global config missing required field: agents_config")
     return GlobalConfig(
         api_key=data.get("anthropic_api_key", ""),
         default_model=data["default_model"],
@@ -47,13 +54,22 @@ def load_global_config(path: str) -> GlobalConfig:
 
 
 def load_environments_config(path: str) -> list[EnvironmentConfig]:
-    with open(path) as f:
-        data = yaml.safe_load(f)
+    try:
+        with open(path) as f:
+            data = yaml.safe_load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Environments config file not found: {path}")
+    except yaml.YAMLError as exc:
+        raise ValueError(f"Failed to parse environments config '{path}': {exc}")
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"Invalid environments config structure in '{path}': expected a mapping at top level"
+        )
     envs = data.get("environments", [])
     result = []
-    for item in envs:
+    for idx, item in enumerate(envs):
         if not item.get("name"):
-            raise ValueError(f"environment entry missing required field: name")
+            raise ValueError(f"environment entry {idx} missing required field: name")
         result.append(EnvironmentConfig(
             name=item["name"],
             description=item.get("description", ""),
@@ -63,13 +79,22 @@ def load_environments_config(path: str) -> list[EnvironmentConfig]:
 
 
 def load_agents_config(path: str) -> list[AgentConfig]:
-    with open(path) as f:
-        data = yaml.safe_load(f)
+    try:
+        with open(path) as f:
+            data = yaml.safe_load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Agents config file not found: {path}")
+    except yaml.YAMLError as exc:
+        raise ValueError(f"Failed to parse agents config '{path}': {exc}")
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"Invalid agents config structure in '{path}': expected a mapping at top level"
+        )
     agents = data.get("agents", [])
     result = []
-    for item in agents:
+    for idx, item in enumerate(agents):
         if not item.get("name"):
-            raise ValueError(f"agent entry missing required field: name")
+            raise ValueError(f"agent entry {idx} missing required field: name")
         if not item.get("system"):
             raise ValueError(f"agent '{item.get('name')}' missing required field: system")
         result.append(AgentConfig(
