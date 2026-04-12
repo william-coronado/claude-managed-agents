@@ -1,0 +1,8 @@
+environments:
+  - name: "cc-env"
+    description: "Content creation environment with unrestricted networking for web research"
+    config:
+      networking:
+        type: "unrestricted"
+      packages:
+        pip: []

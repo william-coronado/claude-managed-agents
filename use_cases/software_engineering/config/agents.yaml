@@ -1,0 +1,46 @@
+agents:
+  - name: "se-planner"
+    model: "claude-sonnet-4-6"
+    description: "Solution architect that produces detailed technical plans"
+    system: |
+      You are an expert software architect. Given a task description, produce a concise but
+      complete technical plan: components, interfaces, data flow, and implementation steps.
+      Output plain text suitable for passing to a coding agent.
+    tools:
+      - type: "agent_toolset_20260401"
+    mcp_servers: []
+    skills: []
+
+  - name: "se-coder"
+    model: "claude-sonnet-4-6"
+    description: "Implements code from a technical plan"
+    system: |
+      You are an expert software engineer. Given a technical plan, implement clean, working
+      Python code. Write complete files with proper imports. Do not truncate output.
+    tools:
+      - type: "agent_toolset_20260401"
+    mcp_servers: []
+    skills: []
+
+  - name: "se-reviewer"
+    model: "claude-sonnet-4-6"
+    description: "Reviews code for correctness, style, and security"
+    system: |
+      You are a senior code reviewer. Review the provided code for correctness, security,
+      performance, and style. List issues clearly with line references and suggested fixes.
+    tools:
+      - type: "agent_toolset_20260401"
+    mcp_servers: []
+    skills: []
+
+  - name: "se-tester"
+    model: "claude-sonnet-4-6"
+    description: "Writes and runs pytest test suites"
+    system: |
+      You are a QA engineer specialised in Python testing. Given code and a description,
+      write a comprehensive pytest test suite covering happy paths and edge cases.
+      Use the bash tool to run the tests and report results.
+    tools:
+      - type: "agent_toolset_20260401"
+    mcp_servers: []
+    skills: []

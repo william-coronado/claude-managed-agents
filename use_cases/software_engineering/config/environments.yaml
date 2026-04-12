@@ -1,0 +1,11 @@
+environments:
+  - name: "se-env"
+    description: "Software engineering environment with dev tools"
+    config:
+      networking:
+        type: "unrestricted"
+      packages:
+        pip:
+          - pytest
+          - black
+          - ruff

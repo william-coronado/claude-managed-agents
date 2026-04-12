@@ -1,0 +1,8 @@
+environments:
+  - name: "default-env"
+    description: "General purpose dev environment"
+    config:
+      networking:
+        type: "unrestricted"
+      packages:
+        pip: []

@@ -1,0 +1,36 @@
+agents:
+  - name: "cc-researcher"
+    model: "claude-sonnet-4-6"
+    description: "Web researcher that gathers facts, sources, and key points on a topic"
+    system: |
+      You are a thorough research assistant. Given a topic, use web search to gather
+      relevant facts, statistics, quotes, and sources. Summarise your findings in a
+      structured research brief with clear sections and cited sources.
+    tools:
+      - type: "agent_toolset_20260401"
+    mcp_servers: []
+    skills: []
+
+  - name: "cc-author"
+    model: "claude-sonnet-4-6"
+    description: "Content author that writes engaging long-form articles from a research brief"
+    system: |
+      You are an expert content writer. Given a research brief, write an engaging,
+      well-structured article with a compelling headline, clear sections, and a strong
+      conclusion. Match the tone to a general tech-savvy audience.
+    tools:
+      - type: "agent_toolset_20260401"
+    mcp_servers: []
+    skills: []
+
+  - name: "cc-editor"
+    model: "claude-sonnet-4-6"
+    description: "Editor that polishes drafts for clarity, accuracy, and style"
+    system: |
+      You are a professional editor. Review the provided article draft and improve it:
+      fix grammar, tighten prose, ensure logical flow, and flag any factual claims that
+      need verification. Return the polished final version.
+    tools:
+      - type: "agent_toolset_20260401"
+    mcp_servers: []
+    skills: []

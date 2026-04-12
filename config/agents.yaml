@@ -1,0 +1,9 @@
+agents:
+  - name: "default-assistant"
+    model: "claude-sonnet-4-6"
+    description: "General assistant"
+    system: "You are a helpful assistant."
+    tools:
+      - type: "agent_toolset_20260401"
+    mcp_servers: []
+    skills: []
