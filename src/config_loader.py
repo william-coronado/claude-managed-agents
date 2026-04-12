@@ -37,6 +37,8 @@ def load_global_config(path: str) -> GlobalConfig:
         raise FileNotFoundError(f"Global config file not found: {path}")
     except yaml.YAMLError as exc:
         raise ValueError(f"Failed to parse global config '{path}': {exc}")
+    if not isinstance(data, dict):
+        raise ValueError(f"Global config '{path}' must be a mapping at the top level")
     if not data.get("default_model"):
         raise ValueError("global config missing required field: default_model")
     if not data.get("environments_config"):
@@ -59,6 +61,10 @@ def load_environments_config(path: str) -> list[EnvironmentConfig]:
         raise FileNotFoundError(f"Environments config file not found: {path}")
     except yaml.YAMLError as exc:
         raise ValueError(f"Failed to parse environments config '{path}': {exc}")
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"Invalid environments config structure in '{path}': expected a mapping at top level"
+        )
     envs = data.get("environments", [])
     result = []
     for idx, item in enumerate(envs):
@@ -80,6 +86,10 @@ def load_agents_config(path: str) -> list[AgentConfig]:
         raise FileNotFoundError(f"Agents config file not found: {path}")
     except yaml.YAMLError as exc:
         raise ValueError(f"Failed to parse agents config '{path}': {exc}")
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"Invalid agents config structure in '{path}': expected a mapping at top level"
+        )
     agents = data.get("agents", [])
     result = []
     for idx, item in enumerate(agents):

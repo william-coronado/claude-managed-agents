@@ -53,6 +53,10 @@ class TestStreamMessage:
         client = self._make_client(events)
         result = stream_message(client, "sess-1", "hi")
         assert result == "Hello world"
+        client.beta.sessions.events.send.assert_called_once_with(
+            "sess-1",
+            events=[{"type": "user.message", "content": [{"type": "text", "text": "hi"}]}],
+        )
 
     def test_prints_agent_message_to_stdout(self, capsys):
         from src.messaging import stream_message
@@ -78,7 +82,7 @@ class TestStreamMessage:
         captured = capsys.readouterr()
         assert "[Tool: bash]" in captured.out
 
-    def test_session_error_raises_runtime_error(self):
+    def test_session_error_raises_runtime_error(self, capsys):
         from src.messaging import stream_message
 
         events = [
@@ -87,6 +91,8 @@ class TestStreamMessage:
         client = self._make_client(events)
         with pytest.raises(RuntimeError, match="something went wrong"):
             stream_message(client, "sess-1", "hi")
+        captured = capsys.readouterr()
+        assert "[Error: something went wrong]" in captured.out
 
     def test_returns_empty_string_when_no_message_blocks(self):
         from src.messaging import stream_message

@@ -79,7 +79,13 @@ class TestLoadGlobalConfig:
     def test_invalid_yaml_raises_value_error(self, tmp_path):
         p = tmp_path / "bad.yaml"
         p.write_text(": invalid: yaml: {{{")
-        with pytest.raises((ValueError, Exception)):
+        with pytest.raises(ValueError, match="Failed to parse global config"):
+            load_global_config(str(p))
+
+    def test_non_dict_yaml_raises_value_error(self, tmp_path):
+        p = tmp_path / "list.yaml"
+        p.write_text("- item1\n- item2\n")
+        with pytest.raises(ValueError, match="must be a mapping at the top level"):
             load_global_config(str(p))
 
 
@@ -118,6 +124,22 @@ class TestLoadEnvironmentsConfig:
     def test_file_not_found_raises(self, tmp_path):
         with pytest.raises(FileNotFoundError, match="missing.yaml"):
             load_environments_config(str(tmp_path / "missing.yaml"))
+
+    def test_invalid_yaml_raises_value_error(self, tmp_path):
+        p = tmp_path / "bad.yaml"
+        p.write_text(": invalid: yaml: {{{")
+        with pytest.raises(ValueError, match="Failed to parse environments config"):
+            load_environments_config(str(p))
+
+    def test_non_dict_yaml_raises_value_error(self, tmp_path):
+        p = tmp_path / "list.yaml"
+        p.write_text("- item1\n- item2\n")
+        with pytest.raises(ValueError, match="expected a mapping at top level"):
+            load_environments_config(str(p))
+
+    def test_missing_environments_key_returns_empty_list(self, tmp_path):
+        path = write_yaml(tmp_path, "environments.yaml", "other_key: value\n")
+        assert load_environments_config(path) == []
 
 
 # ---------------------------------------------------------------------------
@@ -171,3 +193,15 @@ class TestLoadAgentsConfig:
     def test_file_not_found_raises(self, tmp_path):
         with pytest.raises(FileNotFoundError, match="nope.yaml"):
             load_agents_config(str(tmp_path / "nope.yaml"))
+
+    def test_invalid_yaml_raises_value_error(self, tmp_path):
+        p = tmp_path / "bad.yaml"
+        p.write_text(": invalid: yaml: {{{")
+        with pytest.raises(ValueError, match="Failed to parse agents config"):
+            load_agents_config(str(p))
+
+    def test_non_dict_yaml_raises_value_error(self, tmp_path):
+        p = tmp_path / "list.yaml"
+        p.write_text("- item1\n- item2\n")
+        with pytest.raises(ValueError, match="expected a mapping at top level"):
+            load_agents_config(str(p))

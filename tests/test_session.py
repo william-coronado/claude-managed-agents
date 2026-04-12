@@ -53,3 +53,9 @@ class TestCreateSession:
         create_session(client, "agent-1", "env-1", title=None)
         kwargs = client.beta.sessions.create.call_args.kwargs
         assert "title" not in kwargs
+
+    def test_title_leading_trailing_whitespace_stripped(self):
+        client = self._make_client()
+        create_session(client, "agent-1", "env-1", title="  Hello  ")
+        kwargs = client.beta.sessions.create.call_args.kwargs
+        assert kwargs["title"] == "Hello"
