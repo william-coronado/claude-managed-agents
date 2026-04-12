@@ -89,7 +89,7 @@ class TestStreamMessage:
             _make_event("session.error", message="something went wrong"),
         ]
         client = self._make_client(events)
-        with pytest.raises(RuntimeError, match="something went wrong"):
+        with pytest.raises(RuntimeError, match="Session error: something went wrong"):
             stream_message(client, "sess-1", "hi")
         captured = capsys.readouterr()
         assert "[Error: something went wrong]" in captured.out
