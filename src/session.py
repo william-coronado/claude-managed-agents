@@ -14,6 +14,8 @@ def create_session(client, agent_id: str, environment_id: str, title: Optional[s
     kwargs = {"agent": agent_id, "environment_id": environment_id}
     if title:
         # Strip Unicode control/format characters (newlines, tabs, etc.)
-        kwargs["title"] = "".join(c for c in title if c.isprintable())
+        clean_title = "".join(c for c in title if c.isprintable()).strip()
+        if clean_title:
+            kwargs["title"] = clean_title
     obj = client.beta.sessions.create(**kwargs)
     return Session(obj)
