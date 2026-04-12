@@ -16,9 +16,11 @@ class Environment:
 
 def create_environment(client, config: EnvironmentConfig, existing: bool = False) -> Environment:
     if existing:
-        for env in client.beta.environments.list():
-            if env.name == config.name:
-                return Environment(env)
+        for page in client.beta.environments.list().iter_pages():
+            for env in page.data:
+                if env.name == config.name:
+                    return Environment(env)
+        raise SystemExit(f"Error: existing environment '{config.name}' not found")
     api_config = {"type": "cloud", **config.config}
     obj = client.beta.environments.create(
         name=config.name,

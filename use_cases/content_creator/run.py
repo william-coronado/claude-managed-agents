@@ -22,14 +22,18 @@ ENV_CONFIG = os.path.join(USE_CASE_DIR, "config", "environments.yaml")
 AGENT_CONFIG = os.path.join(USE_CASE_DIR, "config", "agents.yaml")
 
 
-def run_agent_step(client, agents: dict, envs: dict, agent_name: str, prompt: str) -> None:
+def run_agent_step(client, agents: dict, envs: dict, agent_name: str, env_name: str, prompt: str) -> str:
     print(f"\n{'='*60}")
     print(f"[{agent_name.upper()}]")
     print(f"{'='*60}")
+    if agent_name not in agents:
+        raise SystemExit(f"Error: agent '{agent_name}' not found in loaded agents")
+    if env_name not in envs:
+        raise SystemExit(f"Error: environment '{env_name}' not found in loaded environments")
     agent = agents[agent_name]
-    env = envs["cc-env"]
+    env = envs[env_name]
     session = create_session(client, agent.id, env.id, title=prompt[:80])
-    stream_message(client, session.id, prompt)
+    return stream_message(client, session.id, prompt)
 
 
 def main():
@@ -61,23 +65,25 @@ def main():
         "Research this topic thoroughly. Gather facts, statistics, key developments, "
         "and notable sources. Produce a structured research brief."
     )
-    run_agent_step(client, agents, envs, "cc-researcher", research_prompt)
+    research_output = run_agent_step(client, agents, envs, "cc-researcher", "cc-env", research_prompt)
 
-    # Step 2: author
+    # Step 2: author — receives the research brief
     author_prompt = (
         f"Topic: {args.topic}\n\n"
-        "A researcher has compiled the brief above. "
+        "A researcher has compiled the following brief:\n\n"
+        f"{research_output}\n\n"
         "Write a compelling, well-structured article based on the research."
     )
-    run_agent_step(client, agents, envs, "cc-author", author_prompt)
+    article_output = run_agent_step(client, agents, envs, "cc-author", "cc-env", author_prompt)
 
-    # Step 3: editor
+    # Step 3: editor — receives the full article draft
     editor_prompt = (
         f"Topic: {args.topic}\n\n"
-        "The author has produced the draft above. "
+        "The author has produced the following draft:\n\n"
+        f"{article_output}\n\n"
         "Edit and polish it: fix grammar, improve flow, and return the final version."
     )
-    run_agent_step(client, agents, envs, "cc-editor", editor_prompt)
+    run_agent_step(client, agents, envs, "cc-editor", "cc-env", editor_prompt)
 
 
 if __name__ == "__main__":

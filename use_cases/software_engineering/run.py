@@ -22,14 +22,18 @@ ENV_CONFIG = os.path.join(USE_CASE_DIR, "config", "environments.yaml")
 AGENT_CONFIG = os.path.join(USE_CASE_DIR, "config", "agents.yaml")
 
 
-def run_agent_step(client, agents: dict, envs: dict, agent_name: str, prompt: str) -> None:
+def run_agent_step(client, agents: dict, envs: dict, agent_name: str, env_name: str, prompt: str) -> str:
     print(f"\n{'='*60}")
     print(f"[{agent_name.upper()}]")
     print(f"{'='*60}")
+    if agent_name not in agents:
+        raise SystemExit(f"Error: agent '{agent_name}' not found in loaded agents")
+    if env_name not in envs:
+        raise SystemExit(f"Error: environment '{env_name}' not found in loaded environments")
     agent = agents[agent_name]
-    env = envs["se-env"]
+    env = envs[env_name]
     session = create_session(client, agent.id, env.id, title=prompt[:80])
-    stream_message(client, session.id, prompt)
+    return stream_message(client, session.id, prompt)
 
 
 def main():
@@ -57,31 +61,36 @@ def main():
 
     # Step 1: planner
     plan_prompt = f"Task: {args.task}\n\nProduce a detailed technical plan."
-    run_agent_step(client, agents, envs, "se-planner", plan_prompt)
+    plan_output = run_agent_step(client, agents, envs, "se-planner", "se-env", plan_prompt)
 
-    # Step 2: coder — include the task so the agent has full context
+    # Step 2: coder — receives the technical plan
     code_prompt = (
         f"Task: {args.task}\n\n"
-        "A planner has produced the architecture above. "
+        "A planner has produced the following architecture:\n\n"
+        f"{plan_output}\n\n"
         "Implement complete, working Python code following that plan."
     )
-    run_agent_step(client, agents, envs, "se-coder", code_prompt)
+    code_output = run_agent_step(client, agents, envs, "se-coder", "se-env", code_prompt)
 
-    # Step 3: reviewer
+    # Step 3: reviewer — receives the implementation
     review_prompt = (
         f"Task: {args.task}\n\n"
-        "The coder has produced the implementation above. "
+        "The coder has produced the following implementation:\n\n"
+        f"{code_output}\n\n"
         "Review it for correctness, security, performance, and style."
     )
-    run_agent_step(client, agents, envs, "se-reviewer", review_prompt)
+    review_output = run_agent_step(client, agents, envs, "se-reviewer", "se-env", review_prompt)
 
-    # Step 4: tester
+    # Step 4: tester — receives the implementation and review
     test_prompt = (
         f"Task: {args.task}\n\n"
-        "The implementation has been reviewed. "
+        "The implementation:\n\n"
+        f"{code_output}\n\n"
+        "Review feedback:\n\n"
+        f"{review_output}\n\n"
         "Write a comprehensive pytest test suite for it and run the tests."
     )
-    run_agent_step(client, agents, envs, "se-tester", test_prompt)
+    run_agent_step(client, agents, envs, "se-tester", "se-env", test_prompt)
 
 
 if __name__ == "__main__":
