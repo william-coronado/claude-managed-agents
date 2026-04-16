@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, call
 
 from src.agent import create_agent, Agent
 from src.config_loader import AgentConfig
+from src.exceptions import ResourceNotFoundError
 
 
 def _make_config(name="test-agent", system="You are helpful.", model=None):
@@ -80,18 +81,18 @@ class TestCreateAgentExisting:
 
         assert agent.id == "id-wanted"
 
-    def test_raises_system_exit_when_not_found(self):
+    def test_raises_lookup_error_when_not_found(self):
         page = MagicMock()
         page.data = [_make_api_agent("other-agent")]
         client = _make_paginated_client([page])
         config = _make_config(name="missing-agent")
 
-        with pytest.raises(SystemExit, match="missing-agent"):
+        with pytest.raises(ResourceNotFoundError, match="missing-agent"):
             create_agent(client, config, default_model="m", existing=True)
 
-    def test_raises_system_exit_when_pages_empty(self):
+    def test_raises_lookup_error_when_pages_empty(self):
         client = _make_paginated_client([])
         config = _make_config(name="any-agent")
 
-        with pytest.raises(SystemExit, match="any-agent"):
+        with pytest.raises(ResourceNotFoundError, match="any-agent"):
             create_agent(client, config, default_model="m", existing=True)

@@ -113,3 +113,17 @@ class TestStreamMessage:
         client = self._make_client(events)
         result = stream_message(client, "sess-1", "hi")
         assert result == "Part1Part2"
+
+    def test_non_text_blocks_in_agent_message_are_skipped(self):
+        from src.messaging import stream_message
+
+        # A block without a .text attribute (e.g. a tool-result block) should
+        # not cause an AttributeError; only text blocks contribute to output.
+        non_text_block = MagicMock(spec=[])  # spec=[] → no attributes at all
+        events = [
+            _make_event("agent.message", content=[_make_block("Hello"), non_text_block]),
+            _make_event("session.status_idle"),
+        ]
+        client = self._make_client(events)
+        result = stream_message(client, "sess-1", "hi")
+        assert result == "Hello"
