@@ -1,0 +1,53 @@
+classDiagram
+    class LookupError
+
+    class ResourceNotFoundError {
+        +message
+    }
+
+    ResourceNotFoundError --|> LookupError
+
+    class AgentConfig
+    class EnvironmentConfig
+
+    class Agent {
+        +underlying
+        +__init__(underlying)
+    }
+
+    class Environment {
+        +underlying
+        +__init__(underlying)
+    }
+
+    class agent_module {
+        +create_agent(client, config, default_model, existing) Agent
+    }
+
+    class environment_module {
+        +create_environment(client, config, existing) Environment
+    }
+
+    class loader_module {
+        +load_resources(client, cfg, env_config_path, agent_config_path, existing) tuple
+    }
+
+    class messaging_module {
+        +stream_message(client, session_id, text) str
+    }
+
+    class AnthropicClient
+
+    agent_module ..> AgentConfig
+    agent_module ..> Agent
+    agent_module ..> ResourceNotFoundError
+
+    environment_module ..> EnvironmentConfig
+    environment_module ..> Environment
+    environment_module ..> ResourceNotFoundError
+
+    loader_module ..> agent_module
+    loader_module ..> environment_module
+    loader_module ..> ResourceNotFoundError
+
+    messaging_module ..> AnthropicClient
