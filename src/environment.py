@@ -1,4 +1,5 @@
 from src.config_loader import EnvironmentConfig
+from src.exceptions import ResourceNotFoundError
 
 
 class Environment:
@@ -20,7 +21,7 @@ def create_environment(client, config: EnvironmentConfig, existing: bool = False
             for env in page.data:
                 if env.name == config.name:
                     return Environment(env)
-        raise LookupError(f"Existing environment '{config.name}' not found")
+        raise ResourceNotFoundError(f"Existing environment '{config.name}' not found")
     api_config = {"type": "cloud", **config.config}
     obj = client.beta.environments.create(
         name=config.name,

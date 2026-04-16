@@ -1,4 +1,5 @@
 from src.config_loader import AgentConfig
+from src.exceptions import ResourceNotFoundError
 
 
 class Agent:
@@ -24,7 +25,7 @@ def create_agent(client, config: AgentConfig, default_model: str, existing: bool
             for agent in page.data:
                 if agent.name == config.name:
                     return Agent(agent)
-        raise LookupError(f"Existing agent '{config.name}' not found")
+        raise ResourceNotFoundError(f"Existing agent '{config.name}' not found")
     model = config.model or default_model
     obj = client.beta.agents.create(
         name=config.name,

@@ -10,9 +10,8 @@ import argparse
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from anthropic import Anthropic
-from src.config_loader import load_global_config, load_environments_config, load_agents_config
-from src.environment import create_environment
-from src.agent import create_agent
+from src.config_loader import load_global_config
+from src.loader import load_resources
 from src.session import create_session
 from src.messaging import stream_message
 
@@ -50,17 +49,7 @@ def main():
 
     client = Anthropic(api_key=api_key)
 
-    try:
-        envs = {
-            e.name: create_environment(client, e, existing=args.existing)
-            for e in load_environments_config(ENV_CONFIG)
-        }
-        agents = {
-            a.name: create_agent(client, a, cfg.default_model, existing=args.existing)
-            for a in load_agents_config(AGENT_CONFIG)
-        }
-    except LookupError as exc:
-        raise SystemExit(f"Error: {exc}") from exc
+    envs, agents = load_resources(client, cfg, ENV_CONFIG, AGENT_CONFIG, existing=args.existing)
 
     # Step 1: researcher
     research_prompt = (
