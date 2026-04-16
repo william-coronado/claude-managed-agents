@@ -48,10 +48,12 @@ This is a Python scaffolding framework for orchestrating **Claude Managed Agents
 | Module | Role |
 |--------|------|
 | `config_loader.py` | Parses YAML files into `GlobalConfig`, `EnvironmentConfig`, `AgentConfig` dataclasses with field validation |
+| `exceptions.py` | Defines `ResourceNotFoundError(LookupError)` raised by `agent.py` / `environment.py` when a named resource is not found in `--existing` mode |
 | `environment.py` | Thin wrapper around `client.beta.environments` API; supports create-new or find-existing-by-name |
 | `agent.py` | Thin wrapper around `client.beta.agents` API; supports create-new or find-existing-by-name |
+| `loader.py` | `load_resources()` helper used by all entry points — iterates over all environments and agents, collects every `ResourceNotFoundError`, and raises a single `SystemExit` listing all missing resources |
 | `session.py` | Creates a session via `client.beta.sessions` API; sanitizes titles by stripping non-printable Unicode |
-| `messaging.py` | Opens an SSE stream (`client.beta.sessions.events.stream`), sends a user message, prints output, returns accumulated text |
+| `messaging.py` | Opens an SSE stream (`client.beta.sessions.events.stream`), sends a user message, prints output, returns accumulated text; logs skipped non-text blocks at DEBUG level |
 
 ### Configuration hierarchy
 
@@ -64,7 +66,7 @@ Each use case has its own `config/` subdirectory that overrides the defaults.
 
 Both `software_engineering/run.py` and `content_creator/run.py` follow the same pattern:
 1. Load config and construct an `Anthropic` client
-2. Create (or look up) an environment and one session per agent
+2. Call `load_resources()` to create (or look up) all environments and agents; any missing resources are reported together before exiting
 3. Run agents sequentially, passing the output of each step as input to the next via `stream_message()`
 
 The `run_agent_step()` helper (defined in each `run.py`) builds the prompt for each step and calls `stream_message()`.
@@ -79,4 +81,4 @@ The `run_agent_step()` helper (defined in each `run.py`) builds the prompt for e
 
 ### Test approach
 
-All 51 tests are unit tests that mock the Anthropic client; there are no integration tests hitting the real API. Tests live in `tests/` and mirror the `src/` module structure.
+All 59 tests are unit tests that mock the Anthropic client; there are no integration tests hitting the real API. Tests live in `tests/` and mirror the `src/` module structure, including `tests/test_loader.py` which verifies the bulk-error-collection contract in `load_resources()`.
