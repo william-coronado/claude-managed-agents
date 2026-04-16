@@ -1,3 +1,8 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 def stream_message(client, session_id: str, text: str) -> str:
     """Open SSE stream, send user message, print agent output to stdout, and return it."""
     output_parts: list[str] = []
@@ -10,8 +15,12 @@ def stream_message(client, session_id: str, text: str) -> str:
             match event.type:
                 case "agent.message":
                     for block in event.content:
-                        print(block.text, end="", flush=True)
-                        output_parts.append(block.text)
+                        block_text = getattr(block, "text", None)
+                        if block_text is None:
+                            logger.debug("Skipping non-text block type=%r in agent.message", getattr(block, "type", "<unknown>"))
+                        if block_text is not None:
+                            print(block_text, end="", flush=True)
+                            output_parts.append(block_text)
                 case "agent.tool_use":
                     print(f"\n[Tool: {event.name}]", flush=True)
                 case "session.error":

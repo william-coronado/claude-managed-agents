@@ -29,8 +29,10 @@ claude-managed-agents/
 │   └── agents.yaml                 # Agent definitions
 ├── src/                            # Core library
 │   ├── config_loader.py            # YAML config loading and validation
+│   ├── exceptions.py               # Custom exceptions (ResourceNotFoundError)
 │   ├── environment.py              # Managed environment creation/lookup
 │   ├── agent.py                    # Managed agent creation/lookup
+│   ├── loader.py                   # load_resources() helper used by all entry points
 │   ├── session.py                  # User session management
 │   └── messaging.py                # SSE streaming and message handling
 ├── use_cases/
@@ -44,7 +46,7 @@ claude-managed-agents/
 │       └── config/
 │           ├── environments.yaml
 │           └── agents.yaml
-├── tests/                          # 51 unit tests
+├── tests/                          # 59 unit tests
 └── docs/
     └── plan.md
 ```
@@ -184,8 +186,9 @@ To create your own pipeline, add a new directory under `use_cases/`, provide `co
 orchestrate.py / use_cases/*/run.py
         │
         ├── config_loader.py   load & validate YAML → dataclasses
-        ├── environment.py     create or reuse cloud environment
-        ├── agent.py           create or reuse managed agent
+        ├── loader.py          create all environments + agents; collect errors
+        │       ├── environment.py   create or reuse cloud environment
+        │       └── agent.py        create or reuse managed agent
         ├── session.py         open a user session
         └── messaging.py       stream SSE events, print output, return text
 ```
@@ -194,7 +197,11 @@ Each layer maps directly to an Anthropic beta API:
 - `client.beta.environments` — execution sandboxes
 - `client.beta.agents` — stateful agent definitions
 - `client.beta.sessions` — per-user conversation contexts
-- `client.beta.sessions.streaming_messages` — SSE response stream
+- `client.beta.sessions.events.stream` — SSE response stream
+
+### Error handling
+
+`environment.py` and `agent.py` raise `ResourceNotFoundError` (a `LookupError` subclass from `src/exceptions.py`) when a named resource is not found in `--existing` mode. `loader.py` collects all such errors across every environment and agent before surfacing them together as a single `SystemExit`, so users see every missing resource in one message rather than one at a time.
 
 ## Testing
 
@@ -202,7 +209,7 @@ Each layer maps directly to an Anthropic beta API:
 pytest tests/
 ```
 
-51 tests covering config loading, environment/agent creation and lookup, session handling, message streaming, and pipeline orchestration. All tests mock the Anthropic client and run in under one second.
+59 tests covering config loading, environment/agent creation and lookup, session handling, message streaming, `load_resources` error collection, and pipeline orchestration. All tests mock the Anthropic client and run in under one second.
 
 ## License
 
