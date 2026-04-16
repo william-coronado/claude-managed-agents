@@ -1,0 +1,41 @@
+sequenceDiagram
+    actor User
+    participant main as se_main
+    participant run_agent_step
+    participant Agents as agents_dict
+    participant Envs as envs_dict
+    participant create_session
+    participant stream_message
+
+    User ->> main: run --task
+
+    Note over main: Step 1: planner
+    main ->> run_agent_step: client, agents, envs, "se-planner", "se-env", plan_prompt
+    run_agent_step ->> Agents: get agent["se-planner"]
+    run_agent_step ->> Envs: get envs["se-env"]
+    run_agent_step ->> create_session: client, agent.id, env.id, title=plan_prompt[:80]
+    create_session -->> run_agent_step: Session
+    run_agent_step ->> stream_message: client, session.id, plan_prompt
+    stream_message -->> run_agent_step: plan_output
+    run_agent_step -->> main: plan_output
+
+    Note over main: Step 2: coder receives planner output
+    main ->> main: build code_prompt with plan_output
+    main ->> run_agent_step: client, agents, envs, "se-coder", "se-env", code_prompt
+    run_agent_step ->> stream_message: ...
+    stream_message -->> run_agent_step: code_output
+    run_agent_step -->> main: code_output
+
+    Note over main: Step 3: reviewer receives implementation
+    main ->> main: build review_prompt with code_output
+    main ->> run_agent_step: client, agents, envs, "se-reviewer", "se-env", review_prompt
+    run_agent_step ->> stream_message: ...
+    stream_message -->> run_agent_step: review_output
+    run_agent_step -->> main: review_output
+
+    Note over main: Step 4: tester receives implementation and review
+    main ->> main: build test_prompt with code_output and review_output
+    main ->> run_agent_step: client, agents, envs, "se-tester", "se-env", test_prompt
+    run_agent_step ->> stream_message: ...
+    stream_message -->> run_agent_step: tester_output
+    run_agent_step -->> main: tester_output
