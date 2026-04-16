@@ -73,18 +73,18 @@ class TestCreateEnvironmentExisting:
 
         assert env.id == "id-wanted"
 
-    def test_raises_system_exit_when_not_found(self):
+    def test_raises_lookup_error_when_not_found(self):
         page = MagicMock()
         page.data = [_make_api_env("other-env")]
         client = _make_paginated_client([page])
         config = _make_config(name="missing-env")
 
-        with pytest.raises(SystemExit, match="missing-env"):
+        with pytest.raises(LookupError, match="missing-env"):
             create_environment(client, config, existing=True)
 
-    def test_raises_system_exit_when_pages_empty(self):
+    def test_raises_lookup_error_when_pages_empty(self):
         client = _make_paginated_client([])
         config = _make_config(name="any-env")
 
-        with pytest.raises(SystemExit, match="any-env"):
+        with pytest.raises(LookupError, match="any-env"):
             create_environment(client, config, existing=True)

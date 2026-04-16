@@ -24,7 +24,7 @@ def create_agent(client, config: AgentConfig, default_model: str, existing: bool
             for agent in page.data:
                 if agent.name == config.name:
                     return Agent(agent)
-        raise SystemExit(f"Error: existing agent '{config.name}' not found")
+        raise LookupError(f"Existing agent '{config.name}' not found")
     model = config.model or default_model
     obj = client.beta.agents.create(
         name=config.name,

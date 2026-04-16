@@ -24,14 +24,17 @@ def main():
 
     client = Anthropic(api_key=api_key)
 
-    envs = {
-        e.name: create_environment(client, e, existing=args.existing)
-        for e in load_environments_config(cfg.environments_config)
-    }
-    agents = {
-        a.name: create_agent(client, a, cfg.default_model, existing=args.existing)
-        for a in load_agents_config(cfg.agents_config)
-    }
+    try:
+        envs = {
+            e.name: create_environment(client, e, existing=args.existing)
+            for e in load_environments_config(cfg.environments_config)
+        }
+        agents = {
+            a.name: create_agent(client, a, cfg.default_model, existing=args.existing)
+            for a in load_agents_config(cfg.agents_config)
+        }
+    except LookupError as exc:
+        raise SystemExit(f"Error: {exc}") from exc
 
     if args.env not in envs:
         raise SystemExit(f"Error: environment '{args.env}' not found in {cfg.environments_config}")

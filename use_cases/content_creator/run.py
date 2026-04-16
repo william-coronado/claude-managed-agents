@@ -50,14 +50,17 @@ def main():
 
     client = Anthropic(api_key=api_key)
 
-    envs = {
-        e.name: create_environment(client, e, existing=args.existing)
-        for e in load_environments_config(ENV_CONFIG)
-    }
-    agents = {
-        a.name: create_agent(client, a, cfg.default_model, existing=args.existing)
-        for a in load_agents_config(AGENT_CONFIG)
-    }
+    try:
+        envs = {
+            e.name: create_environment(client, e, existing=args.existing)
+            for e in load_environments_config(ENV_CONFIG)
+        }
+        agents = {
+            a.name: create_agent(client, a, cfg.default_model, existing=args.existing)
+            for a in load_agents_config(AGENT_CONFIG)
+        }
+    except LookupError as exc:
+        raise SystemExit(f"Error: {exc}") from exc
 
     # Step 1: researcher
     research_prompt = (
