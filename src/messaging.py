@@ -10,8 +10,12 @@ def stream_message(client, session_id: str, text: str) -> str:
             match event.type:
                 case "agent.message":
                     for block in event.content:
-                        print(block.text, end="", flush=True)
-                        output_parts.append(block.text)
+                        # Only text blocks carry a .text attribute; skip tool-result
+                        # blocks or other structured content types gracefully.
+                        block_text = getattr(block, "text", None)
+                        if block_text is not None:
+                            print(block_text, end="", flush=True)
+                            output_parts.append(block_text)
                 case "agent.tool_use":
                     print(f"\n[Tool: {event.name}]", flush=True)
                 case "session.error":
