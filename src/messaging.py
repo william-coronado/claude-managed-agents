@@ -1,3 +1,8 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 def stream_message(client, session_id: str, text: str) -> str:
     """Open SSE stream, send user message, print agent output to stdout, and return it."""
     output_parts: list[str] = []
@@ -10,9 +15,9 @@ def stream_message(client, session_id: str, text: str) -> str:
             match event.type:
                 case "agent.message":
                     for block in event.content:
-                        # Only text blocks carry a .text attribute; skip tool-result
-                        # blocks or other structured content types gracefully.
                         block_text = getattr(block, "text", None)
+                        if block_text is None:
+                            logger.debug("Skipping non-text block type=%r in agent.message", getattr(block, "type", "<unknown>"))
                         if block_text is not None:
                             print(block_text, end="", flush=True)
                             output_parts.append(block_text)

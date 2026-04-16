@@ -23,7 +23,7 @@ def main():
 
     client = Anthropic(api_key=api_key)
 
-    envs, agents = load_resources(client, cfg, cfg.environments_config, cfg.agents_config, existing=args.existing)
+    envs, agents = load_resources(client, cfg.default_model, cfg.environments_config, cfg.agents_config, existing=args.existing)
 
     if args.env not in envs:
         raise SystemExit(f"Error: environment '{args.env}' not found in {cfg.environments_config}")

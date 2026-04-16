@@ -49,7 +49,7 @@ def main():
 
     client = Anthropic(api_key=api_key)
 
-    envs, agents = load_resources(client, cfg, ENV_CONFIG, AGENT_CONFIG, existing=args.existing)
+    envs, agents = load_resources(client, cfg.default_model, ENV_CONFIG, AGENT_CONFIG, existing=args.existing)
 
     # Step 1: planner
     plan_prompt = f"Task: {args.task}\n\nProduce a detailed technical plan."
