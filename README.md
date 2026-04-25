@@ -11,6 +11,7 @@ This project provides a thin, configuration-driven layer on top of the Anthropic
 - Define agents declaratively (system prompt, model, tools, MCP servers, skills)
 - Stream agent responses to stdout in real-time via Server-Sent Events
 - Chain agents sequentially, passing each output as input to the next
+- Capture files the agent writes to `/mnt/session/outputs/` to a local directory in real time
 
 **Included use cases:**
 - **Software Engineering pipeline** — planner → coder → reviewer → tester
@@ -21,6 +22,7 @@ This project provides a thin, configuration-driven layer on top of the Anthropic
 ```
 claude-managed-agents/
 ├── orchestrate.py                  # Generic single-agent CLI entry point
+├── download_outputs.py             # Standalone script: download a session's output files
 ├── requirements.txt
 ├── .env.example
 ├── config/                         # Default global configuration
@@ -35,7 +37,8 @@ claude-managed-agents/
 │   ├── loader.py                   # load_resources() helper used by all entry points
 │   ├── session.py                  # User session management
 │   ├── messaging.py                # SSE streaming and message handling
-│   └── pipeline.py                 # Shared run_agent_step() used by all use-case runners
+│   ├── pipeline.py                 # Shared run_agent_step() used by all use-case runners
+│   └── downloads.py                # download_session_outputs() — fetch session files locally
 ├── use_cases/
 │   ├── software_engineering/       # SE pipeline use case
 │   │   ├── run.py
@@ -47,7 +50,7 @@ claude-managed-agents/
 │       └── config/
 │           ├── environments.yaml
 │           └── agents.yaml
-├── tests/                          # 59 unit tests
+├── tests/                          # 65 unit tests
 └── docs/
     └── plan.md
 ```
@@ -106,6 +109,8 @@ python orchestrate.py \
 | `--prompt` | _(required)_ | Message to send to the agent |
 | `--existing` | `false` | Reuse existing cloud resources |
 
+> Output file download is not available in `orchestrate.py`. Use `download_outputs.py` to fetch files from a specific session ID.
+
 ### Software Engineering pipeline
 
 A four-agent sequential pipeline that takes a high-level task and produces planned, coded, reviewed, and tested Python output.
@@ -114,6 +119,16 @@ A four-agent sequential pipeline that takes a high-level task and produces plann
 python use_cases/software_engineering/run.py \
   --task "Build a command-line todo app with file persistence and unit tests."
 ```
+
+Add `--output-dir` to capture any files the agents write to `/mnt/session/outputs/` during each step:
+
+```bash
+python use_cases/software_engineering/run.py \
+  --task "Build a command-line todo app with file persistence and unit tests." \
+  --output-dir ./se-outputs
+```
+
+Files are captured in real time from the SSE stream and saved under `<output-dir>/<agent-name>/` to keep each step's outputs separate (e.g. `./se-outputs/se-coder/app.py`, `./se-outputs/se-tester/test_app.py`).
 
 **Pipeline stages:**
 1. `se-planner` — produces a detailed technical architecture plan
@@ -131,6 +146,16 @@ A three-agent sequential pipeline that researches a topic and produces a polishe
 python use_cases/content_creator/run.py \
   --topic "The impact of AI agents on software development in 2026."
 ```
+
+Add `--output-dir` to capture any files the agents write to `/mnt/session/outputs/` during each step:
+
+```bash
+python use_cases/content_creator/run.py \
+  --topic "The impact of AI agents on software development in 2026." \
+  --output-dir ./cc-outputs
+```
+
+Files are captured in real time from the SSE stream and saved under `<output-dir>/<agent-name>/` (e.g. `./cc-outputs/cc-author/article.md`).
 
 **Pipeline stages:**
 1. `cc-researcher` — gathers facts, statistics, and sources via web search
@@ -181,10 +206,42 @@ agents:
 
 To create your own pipeline, add a new directory under `use_cases/`, provide `config/environments.yaml` and `config/agents.yaml`, and write a `run.py` that imports `run_agent_step` from `src.pipeline` and chains agent outputs.
 
+### Downloading session output files
+
+Files an agent writes to `/mnt/session/outputs/` are captured two ways:
+
+**Via `--output-dir` in any pipeline runner** (captured in real time during each step):
+
+```bash
+python use_cases/software_engineering/run.py --task "..." --output-dir ./outputs
+```
+
+**Via the standalone script** (for any past session by ID):
+
+```bash
+python download_outputs.py --session-id <session-id> --output-dir ./outputs
+# Optionally narrow to a specific subdirectory:
+python download_outputs.py --session-id <session-id> --output-dir ./outputs --remote-dir /mnt/session/outputs/todo/
+```
+
+**How it works:** The managed agents platform does not expose agent-created files through any post-session API. Instead, file content is read from `agent.tool_use` SSE events — when the agent calls its built-in `write` tool, the event payload contains both `file_path` and `content`. During a live pipeline run, `stream_message()` intercepts these events and saves files immediately. For past sessions, `download_outputs.py` replays all events via `client.beta.sessions.events.list()` to extract the same write calls.
+
+Files are saved under `<output-dir>/<agent-name>/` when run from a pipeline step, preserving any subdirectory structure under the remote dir (e.g. an agent writing to `/mnt/session/outputs/todo/main.py` with `--output-dir ./out` saves to `./out/<agent-name>/todo/main.py`).
+
+> **Note:** Only files written via the agent's `write` tool are captured. Files written via bash commands (e.g. `echo ... > file`) are not.
+
+## Sequence Diagrams
+
+Focused flow diagrams are available in:
+
+- [Orchestrate flow](docs/sequence_diagram_orchestrate.mmd)
+- [Content Creator pipeline flow](docs/sequence_diagram_content_creator.mmd)
+- [Software Engineering pipeline flow](docs/sequence_diagram_software_engineering.mmd)
+
 ## Architecture
 
 ```
-orchestrate.py / use_cases/*/run.py
+orchestrate.py / use_cases/*/run.py / download_outputs.py
         │
         ├── config_loader.py   load & validate YAML → dataclasses
         ├── loader.py          create all environments + agents; collect errors
@@ -192,15 +249,18 @@ orchestrate.py / use_cases/*/run.py
         │       └── agent.py        create or reuse managed agent (warns on model drift)
         ├── pipeline.py        run_agent_step() — shared step runner for all pipelines
         │       ├── session.py       open a user session
-        │       └── messaging.py     stream SSE events, print output, return text
-        └── messaging.py       (also used directly by orchestrate.py)
+        │       ├── messaging.py     stream SSE events, print output, return text
+        │       └── downloads.py     (optional) download session output files locally
+        ├── messaging.py       (also used directly by orchestrate.py)
+        └── downloads.py       download_session_outputs() — fetch /mnt/session/outputs/ files
 ```
 
 Each layer maps directly to an Anthropic beta API:
 - `client.beta.environments` — execution sandboxes
 - `client.beta.agents` — stateful agent definitions
 - `client.beta.sessions` — per-user conversation contexts
-- `client.beta.sessions.events.stream` — SSE response stream
+- `client.beta.sessions.events.stream` — SSE response stream (also source of `write` tool events for file capture)
+- `client.beta.sessions.events.list` — replay past events (used by `download_outputs.py` for post-session retrieval)
 
 ### Error handling
 
@@ -212,7 +272,7 @@ Each layer maps directly to an Anthropic beta API:
 pytest tests/
 ```
 
-59 tests covering config loading, environment/agent creation and lookup, session handling, message streaming, `load_resources` error collection, and pipeline orchestration. All tests mock the Anthropic client and run in under one second.
+77 tests covering config loading, environment/agent creation and lookup, session handling, message streaming, real-time file capture from write tool events, `load_resources` error collection, pipeline orchestration, event-replay file download, and the `download_outputs.py` CLI. All tests mock the Anthropic client and run in under one second.
 
 ## License
 

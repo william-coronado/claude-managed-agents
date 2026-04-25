@@ -8,35 +8,76 @@ sequenceDiagram
     participant S as create_session
     participant M as stream_message
 
-    User ->> SE: python use_cases/software_engineering/run.py --task [--existing]
+    User ->> SE: python use_cases/software_engineering/run.py --task [--existing] [--output-dir DIR]
     SE ->> CL: load_global_config(config)
     CL -->> SE: GlobalConfig
     SE ->> A: Anthropic(api_key)
     SE ->> L: load_resources(client, default_model, ENV_CONFIG, AGENT_CONFIG, existing)
     L -->> SE: envs_dict, agents_dict
 
-    SE ->> P: run_agent_step(se-planner, se-env, plan_prompt)
+    SE ->> P: run_agent_step(se-planner, se-env, plan_prompt, output_dir)
     P ->> S: create_session(...)
-    P ->> M: stream_message(...)
-    M -->> P: plan_output
-    P -->> SE: plan_output
+    P ->> M: stream_message(..., output_dir=output_dir / "se-planner")
+    alt stream succeeds
+        M -->> P: plan_output
+    else stream raises
+        M -->> P: RuntimeError
+    end
+    alt stream succeeded
+        P -->> SE: plan_output
+    else stream failed
+        P -->> SE: RuntimeError
+    end
 
-    SE ->> P: run_agent_step(se-coder, se-env, prompt + plan_output)
+    SE ->> P: run_agent_step(se-coder, se-env, prompt + plan_output, output_dir)
     P ->> S: create_session(...)
-    P ->> M: stream_message(...)
-    M -->> P: code_output
-    P -->> SE: code_output
+    P ->> M: stream_message(..., output_dir=output_dir / "se-coder")
+    alt stream succeeds
+        M -->> P: code_output
+    else stream raises
+        M -->> P: RuntimeError
+    end
+    alt stream succeeded
+        P -->> SE: code_output
+    else stream failed
+        P -->> SE: RuntimeError
+    end
 
-    SE ->> P: run_agent_step(se-reviewer, se-env, prompt + code_output)
+    SE ->> P: run_agent_step(se-reviewer, se-env, prompt + code_output, output_dir)
     P ->> S: create_session(...)
-    P ->> M: stream_message(...)
-    M -->> P: review_output
-    P -->> SE: review_output
+    P ->> M: stream_message(..., output_dir=output_dir / "se-reviewer")
+    alt stream succeeds
+        M -->> P: review_output
+    else stream raises
+        M -->> P: RuntimeError
+    end
+    alt stream succeeded
+        P -->> SE: review_output
+    else stream failed
+        P -->> SE: RuntimeError
+    end
 
-    SE ->> P: run_agent_step(se-tester, se-env, prompt + code_output + review_output)
+    SE ->> P: run_agent_step(se-tester, se-env, prompt + code_output + review_output, output_dir)
     P ->> S: create_session(...)
-    P ->> M: stream_message(...)
-    M -->> P: test_output
-    P -->> SE: test_output
+    P ->> M: stream_message(..., output_dir=output_dir / "se-tester")
+    alt stream succeeds
+        M -->> P: test_output
+    else stream raises
+        M -->> P: RuntimeError
+    end
+    alt stream succeeded
+        P -->> SE: test_output
+    else stream failed
+        P -->> SE: RuntimeError
+    end
 
+    Note over M: During streaming, write tool events are captured in real time
+    Note over M: Only writes under /mnt/session/outputs/ are saved to output_dir
+    Note over P: No post-step download/finally step in run_agent_step
+
+    alt missing agent/env key in run_agent_step
+        P -->> SE: KeyError
+        SE -->> User: SystemExit("Error: ...")
+    else success
     SE -->> User: tester output streamed
+    end

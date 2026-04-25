@@ -8,29 +8,62 @@ sequenceDiagram
     participant S as create_session
     participant M as stream_message
 
-    User ->> C: python use_cases/content_creator/run.py --topic [--existing]
+    User ->> C: python use_cases/content_creator/run.py --topic [--existing] [--output-dir DIR]
     C ->> CL: load_global_config(config)
     CL -->> C: GlobalConfig
     C ->> A: Anthropic(api_key)
     C ->> L: load_resources(client, default_model, ENV_CONFIG, AGENT_CONFIG, existing)
     L -->> C: envs_dict, agents_dict
 
-    C ->> P: run_agent_step(cc-researcher, cc-env, research_prompt)
+    C ->> P: run_agent_step(cc-researcher, cc-env, research_prompt, output_dir)
     P ->> S: create_session(...)
-    P ->> M: stream_message(...)
-    M -->> P: research_output
-    P -->> C: research_output
+    P ->> M: stream_message(..., output_dir=output_dir / "cc-researcher")
+    alt stream succeeds
+        M -->> P: research_output
+    else stream raises
+        M -->> P: RuntimeError
+    end
+    alt stream succeeded
+        P -->> C: research_output
+    else stream failed
+        P -->> C: RuntimeError
+    end
 
-    C ->> P: run_agent_step(cc-author, cc-env, prompt + research_output)
+    C ->> P: run_agent_step(cc-author, cc-env, prompt + research_output, output_dir)
     P ->> S: create_session(...)
-    P ->> M: stream_message(...)
-    M -->> P: article_output
-    P -->> C: article_output
+    P ->> M: stream_message(..., output_dir=output_dir / "cc-author")
+    alt stream succeeds
+        M -->> P: article_output
+    else stream raises
+        M -->> P: RuntimeError
+    end
+    alt stream succeeded
+        P -->> C: article_output
+    else stream failed
+        P -->> C: RuntimeError
+    end
 
-    C ->> P: run_agent_step(cc-editor, cc-env, prompt + article_output)
+    C ->> P: run_agent_step(cc-editor, cc-env, prompt + article_output, output_dir)
     P ->> S: create_session(...)
-    P ->> M: stream_message(...)
-    M -->> P: final_output
-    P -->> C: final_output
+    P ->> M: stream_message(..., output_dir=output_dir / "cc-editor")
+    alt stream succeeds
+        M -->> P: final_output
+    else stream raises
+        M -->> P: RuntimeError
+    end
+    alt stream succeeded
+        P -->> C: final_output
+    else stream failed
+        P -->> C: RuntimeError
+    end
 
+    Note over M: During streaming, write tool events are captured in real time
+    Note over M: Only writes under /mnt/session/outputs/ are saved to output_dir
+    Note over P: No post-step download/finally step in run_agent_step
+
+    alt missing agent/env key in run_agent_step
+        P -->> C: KeyError
+        C -->> User: SystemExit("Error: ...")
+    else success
     C -->> User: final edited article
+    end
