@@ -20,44 +20,68 @@ sequenceDiagram
     C ->> P: run_agent_step(cc-researcher, cc-env, research_prompt, output_dir)
     P ->> S: create_session(...)
     P ->> M: stream_message(...)
-    M -->> P: research_output
-    alt output_dir is provided
-        P ->> D: download_session_outputs(client, session.id, output_dir)
+    alt stream succeeds
+        M -->> P: research_output
+    else stream raises
+        M -->> P: RuntimeError
+    end
+    alt output_dir is provided (finally)
+        P ->> D: download_session_outputs(client, session.id, output_dir / "cc-researcher")
         D ->> F: files.list(scope_id=session.id)
         loop each file
             D ->> F: files.download(file_id).write_to_file(dest)
         end
         D -->> P: downloaded_count
     end
-    P -->> C: research_output
+    alt stream succeeded
+        P -->> C: research_output
+    else stream failed
+        P -->> C: RuntimeError
+    end
 
     C ->> P: run_agent_step(cc-author, cc-env, prompt + research_output, output_dir)
     P ->> S: create_session(...)
     P ->> M: stream_message(...)
-    M -->> P: article_output
-    alt output_dir is provided
-        P ->> D: download_session_outputs(client, session.id, output_dir)
+    alt stream succeeds
+        M -->> P: article_output
+    else stream raises
+        M -->> P: RuntimeError
+    end
+    alt output_dir is provided (finally)
+        P ->> D: download_session_outputs(client, session.id, output_dir / "cc-author")
         D ->> F: files.list(scope_id=session.id)
         loop each file
             D ->> F: files.download(file_id).write_to_file(dest)
         end
         D -->> P: downloaded_count
     end
-    P -->> C: article_output
+    alt stream succeeded
+        P -->> C: article_output
+    else stream failed
+        P -->> C: RuntimeError
+    end
 
     C ->> P: run_agent_step(cc-editor, cc-env, prompt + article_output, output_dir)
     P ->> S: create_session(...)
     P ->> M: stream_message(...)
-    M -->> P: final_output
-    alt output_dir is provided
-        P ->> D: download_session_outputs(client, session.id, output_dir)
+    alt stream succeeds
+        M -->> P: final_output
+    else stream raises
+        M -->> P: RuntimeError
+    end
+    alt output_dir is provided (finally)
+        P ->> D: download_session_outputs(client, session.id, output_dir / "cc-editor")
         D ->> F: files.list(scope_id=session.id)
         loop each file
             D ->> F: files.download(file_id).write_to_file(dest)
         end
         D -->> P: downloaded_count
     end
-    P -->> C: final_output
+    alt stream succeeded
+        P -->> C: final_output
+    else stream failed
+        P -->> C: RuntimeError
+    end
 
     alt missing agent/env key in run_agent_step
         P -->> C: KeyError

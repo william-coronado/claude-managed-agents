@@ -60,7 +60,7 @@ This is a Python scaffolding framework for orchestrating **Claude Managed Agents
 | `loader.py` | `load_resources()` helper used by all entry points — iterates over all environments and agents, collects every `ResourceNotFoundError`, and raises a single `SystemExit` listing all missing resources |
 | `session.py` | Creates a session via `client.beta.sessions` API; sanitizes titles by stripping non-printable Unicode |
 | `messaging.py` | Opens an SSE stream (`client.beta.sessions.events.stream`), sends a user message, prints output, returns accumulated text; logs skipped non-text blocks at DEBUG level |
-| `pipeline.py` | Shared `run_agent_step()` function used by all use-case pipeline runners — creates a session, streams a prompt, and optionally downloads session output files |
+| `pipeline.py` | Shared `run_agent_step()` function used by all use-case pipeline runners — creates a session, streams a prompt (wrapped in `try/finally`), and optionally downloads session output files into `output_dir/<agent_name>/` |
 | `downloads.py` | `download_session_outputs()` — lists files scoped to a session via `client.beta.files.list(scope_id=)` and writes each to a local directory using `BinaryAPIResponse.write_to_file()` |
 
 ### Configuration hierarchy
@@ -76,7 +76,7 @@ Both `software_engineering/run.py` and `content_creator/run.py` follow the same 
 1. Load config and construct an `Anthropic` client
 2. Call `load_resources()` to create (or look up) all environments and agents; any missing resources are reported together before exiting
 3. Run agents sequentially, passing the output of each step as input to the next via `run_agent_step()`
-4. If `--output-dir` is provided, `run_agent_step()` calls `download_session_outputs()` after each step
+4. If `--output-dir` is provided, `run_agent_step()` downloads session outputs into `<output_dir>/<agent_name>/` after each step — even if streaming raised an error
 
 `run_agent_step()` lives in `src/pipeline.py` and is imported by both runners. It creates a session, calls `stream_message()`, and optionally downloads output files via `src/downloads.py`.
 
@@ -92,4 +92,4 @@ Both `software_engineering/run.py` and `content_creator/run.py` follow the same 
 
 ### Test approach
 
-All 65 tests are unit tests that mock the Anthropic client; there are no integration tests hitting the real API. Tests live in `tests/` and mirror the `src/` module structure, including `tests/test_loader.py` which verifies the bulk-error-collection contract in `load_resources()` and `tests/test_downloads.py` which covers `download_session_outputs()`. Tests for `run_agent_step()` patch `src.pipeline.create_session` and `src.pipeline.stream_message`.
+All 69 tests are unit tests that mock the Anthropic client; there are no integration tests hitting the real API. Tests live in `tests/` and mirror the `src/` module structure, including `tests/test_loader.py` which verifies the bulk-error-collection contract in `load_resources()`, `tests/test_downloads.py` which covers `download_session_outputs()` and the `download_outputs.py` CLI, and `TestRunAgentStepOutputDownload` in `tests/test_use_case_run_agent_step.py` which verifies the subdirectory namespacing and `try/finally` download guarantee. Tests for `run_agent_step()` patch `src.pipeline.create_session`, `src.pipeline.stream_message`, and `src.pipeline.download_session_outputs`.

@@ -128,6 +128,8 @@ python use_cases/software_engineering/run.py \
   --output-dir ./se-outputs
 ```
 
+Files are saved under `<output-dir>/<agent-name>/` to keep each step's outputs separate (e.g. `./se-outputs/se-coder/app.py`, `./se-outputs/se-tester/test_app.py`). Downloads run even if a step's streaming fails.
+
 **Pipeline stages:**
 1. `se-planner` — produces a detailed technical architecture plan
 2. `se-coder` — implements Python code from the plan
@@ -152,6 +154,8 @@ python use_cases/content_creator/run.py \
   --topic "The impact of AI agents on software development in 2026." \
   --output-dir ./cc-outputs
 ```
+
+Files are saved under `<output-dir>/<agent-name>/` (e.g. `./cc-outputs/cc-author/article.md`). Downloads run even if a step's streaming fails.
 
 **Pipeline stages:**
 1. `cc-researcher` — gathers facts, statistics, and sources via web search
@@ -218,7 +222,7 @@ python use_cases/software_engineering/run.py --task "..." --output-dir ./outputs
 python download_outputs.py --session-id <session-id> --output-dir ./outputs
 ```
 
-Both use `src/downloads.py` → `download_session_outputs(client, session_id, output_dir)`, which calls `client.beta.files.list(scope_id=session_id)` to enumerate session-scoped files and saves each with `write_to_file()`.
+Both use `src/downloads.py` → `download_session_outputs(client, session_id, output_dir)`, which calls `client.beta.files.list(scope_id=session_id)` to enumerate session-scoped files and saves each with `write_to_file()`. When called from a pipeline step, `output_dir` is automatically namespaced as `<base_dir>/<agent_name>/` to prevent filename collisions across steps. Downloads run even if a step's streaming raises an error (`try/finally` in `run_agent_step`).
 
 ## Sequence Diagrams
 
@@ -262,7 +266,7 @@ Each layer maps directly to an Anthropic beta API:
 pytest tests/
 ```
 
-65 tests covering config loading, environment/agent creation and lookup, session handling, message streaming, `load_resources` error collection, pipeline orchestration, and session output file downloads. All tests mock the Anthropic client and run in under one second.
+69 tests covering config loading, environment/agent creation and lookup, session handling, message streaming, `load_resources` error collection, pipeline orchestration, session output file downloads, and the `download_outputs.py` CLI. All tests mock the Anthropic client and run in under one second.
 
 ## License
 

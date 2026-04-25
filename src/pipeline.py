@@ -30,7 +30,9 @@ def run_agent_step(
     agent = agents[agent_name]
     env = envs[env_name]
     session = create_session(client, agent.id, env.id, title=prompt[:80])
-    result = stream_message(client, session.id, prompt)
-    if output_dir is not None:
-        download_session_outputs(client, session.id, output_dir)
+    try:
+        result = stream_message(client, session.id, prompt)
+    finally:
+        if output_dir is not None:
+            download_session_outputs(client, session.id, output_dir / agent_name)
     return result

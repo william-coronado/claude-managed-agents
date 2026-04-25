@@ -1,4 +1,4 @@
-"""Unit tests for src/downloads.py"""
+"""Unit tests for src/downloads.py and download_outputs.py CLI."""
 import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
@@ -94,3 +94,25 @@ class TestDownloadSessionOutputs:
         self._call(client, "sess-6", tmp_path / "out")
 
         mock_binary.write_to_file.assert_called_once_with(tmp_path / "out" / "my_file.py")
+
+
+# ---------------------------------------------------------------------------
+# download_outputs.py CLI
+# ---------------------------------------------------------------------------
+
+class TestDownloadOutputsCLI:
+    def test_main_calls_download_with_parsed_args(self, tmp_path):
+        import download_outputs
+
+        mock_client = MagicMock()
+        mock_cfg = MagicMock(api_key=None)
+
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}), \
+             patch("download_outputs.load_global_config", return_value=mock_cfg), \
+             patch("download_outputs.Anthropic", return_value=mock_client), \
+             patch("download_outputs.download_session_outputs") as mock_dl, \
+             patch("sys.argv", ["download_outputs.py", "--session-id", "sess-99",
+                                "--output-dir", str(tmp_path)]):
+            download_outputs.main()
+
+        mock_dl.assert_called_once_with(mock_client, "sess-99", Path(str(tmp_path)))

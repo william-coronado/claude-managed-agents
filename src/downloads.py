@@ -1,6 +1,5 @@
 import logging
 from pathlib import Path
-from typing import Optional
 
 from anthropic import Anthropic
 
@@ -24,7 +23,7 @@ def download_session_outputs(client: Anthropic, session_id: str, output_dir: Pat
         logger.info("Downloaded %s -> %s", file_meta.filename, dest)
         count += 1
     if count:
-        print(f"[Downloaded {count} file(s) to {output_dir}]")
+        logger.info("Downloaded %d file(s) to %s", count, output_dir)
     else:
         logger.debug("No downloadable output files found for session %s", session_id)
     return count
