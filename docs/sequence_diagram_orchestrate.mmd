@@ -1,0 +1,62 @@
+sequenceDiagram
+    actor User
+    participant O as orchestrate.main
+    participant CL as config_loader
+    participant A as AnthropicClient
+    participant L as load_resources
+    participant E as create_environment
+    participant G as create_agent
+    participant S as create_session
+    participant M as stream_message
+
+    User ->> O: python orchestrate.py --prompt --agent --env [--existing]
+    O ->> CL: load_global_config(config)
+    CL -->> O: GlobalConfig
+    O ->> A: Anthropic(api_key)
+    O ->> L: load_resources(client, default_model, env_cfg, agent_cfg, existing)
+
+    loop each environment config
+        L ->> E: create_environment(..., existing)
+        alt existing=True and missing
+            E -->> L: ResourceNotFoundError
+            L ->> L: collect error
+        else found or created
+            E -->> L: Environment
+        end
+    end
+
+    loop each agent config
+        L ->> G: create_agent(..., default_model, existing)
+        alt existing=True and missing
+            G -->> L: ResourceNotFoundError
+            L ->> L: collect error
+        else found or created
+            G -->> L: Agent
+        end
+    end
+
+    alt missing resources collected
+        L -->> O: SystemExit("Error: ...; ...")
+        O -->> User: exit with aggregated errors
+    else loaded successfully
+        L -->> O: envs_dict, agents_dict
+        O ->> S: create_session(agent.id, env.id, title=prompt[:80])
+        S ->> A: beta.sessions.create(...)
+        S -->> O: Session(id)
+        O ->> M: stream_message(client, session.id, prompt)
+        M ->> A: sessions.events.stream(session.id)
+        M ->> A: sessions.events.send(user.message)
+        loop stream events
+            alt agent.message
+                M ->> M: print and append text
+            else agent.tool_use
+                M ->> M: print tool marker
+            else session.error
+                M -->> O: RuntimeError
+            else session.status_idle
+                M ->> M: stop
+            end
+        end
+        M -->> O: accumulated text
+        O -->> User: response streamed
+    end

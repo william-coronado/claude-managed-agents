@@ -18,11 +18,12 @@ def stream_message(client, session_id: str, text: str) -> str:
                         block_text = getattr(block, "text", None)
                         if block_text is None:
                             logger.debug("Skipping non-text block type=%r in agent.message", getattr(block, "type", "<unknown>"))
-                        if block_text is not None:
+                        else:
                             print(block_text, end="", flush=True)
                             output_parts.append(block_text)
                 case "agent.tool_use":
-                    print(f"\n[Tool: {event.name}]", flush=True)
+                    tool_name = getattr(event, "name", "<unknown>")
+                    print(f"\n[Tool: {tool_name}]", flush=True)
                 case "session.error":
                     error_msg = getattr(event, "message", "unknown error")
                     print(f"\n[Error: {error_msg}]", flush=True)

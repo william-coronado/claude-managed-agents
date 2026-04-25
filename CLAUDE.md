@@ -50,10 +50,11 @@ This is a Python scaffolding framework for orchestrating **Claude Managed Agents
 | `config_loader.py` | Parses YAML files into `GlobalConfig`, `EnvironmentConfig`, `AgentConfig` dataclasses with field validation |
 | `exceptions.py` | Defines `ResourceNotFoundError(LookupError)` raised by `agent.py` / `environment.py` when a named resource is not found in `--existing` mode |
 | `environment.py` | Thin wrapper around `client.beta.environments` API; supports create-new or find-existing-by-name |
-| `agent.py` | Thin wrapper around `client.beta.agents` API; supports create-new or find-existing-by-name |
+| `agent.py` | Thin wrapper around `client.beta.agents` API; supports create-new or find-existing-by-name; logs a warning when `--existing` reuses an agent whose stored model differs from the current config |
 | `loader.py` | `load_resources()` helper used by all entry points — iterates over all environments and agents, collects every `ResourceNotFoundError`, and raises a single `SystemExit` listing all missing resources |
 | `session.py` | Creates a session via `client.beta.sessions` API; sanitizes titles by stripping non-printable Unicode |
 | `messaging.py` | Opens an SSE stream (`client.beta.sessions.events.stream`), sends a user message, prints output, returns accumulated text; logs skipped non-text blocks at DEBUG level |
+| `pipeline.py` | Shared `run_agent_step()` function used by all use-case pipeline runners — creates a session and streams a prompt to a named agent/environment pair |
 
 ### Configuration hierarchy
 
@@ -67,9 +68,9 @@ Each use case has its own `config/` subdirectory that overrides the defaults.
 Both `software_engineering/run.py` and `content_creator/run.py` follow the same pattern:
 1. Load config and construct an `Anthropic` client
 2. Call `load_resources()` to create (or look up) all environments and agents; any missing resources are reported together before exiting
-3. Run agents sequentially, passing the output of each step as input to the next via `stream_message()`
+3. Run agents sequentially, passing the output of each step as input to the next via `run_agent_step()`
 
-The `run_agent_step()` helper (defined in each `run.py`) builds the prompt for each step and calls `stream_message()`.
+`run_agent_step()` lives in `src/pipeline.py` and is imported by both runners. It creates a session and calls `stream_message()` for the named agent/environment pair.
 
 ### Anthropic SDK beta APIs used
 
@@ -81,4 +82,4 @@ The `run_agent_step()` helper (defined in each `run.py`) builds the prompt for e
 
 ### Test approach
 
-All 59 tests are unit tests that mock the Anthropic client; there are no integration tests hitting the real API. Tests live in `tests/` and mirror the `src/` module structure, including `tests/test_loader.py` which verifies the bulk-error-collection contract in `load_resources()`.
+All 59 tests are unit tests that mock the Anthropic client; there are no integration tests hitting the real API. Tests live in `tests/` and mirror the `src/` module structure, including `tests/test_loader.py` which verifies the bulk-error-collection contract in `load_resources()`. Tests for `run_agent_step()` patch `src.pipeline.create_session` and `src.pipeline.stream_message`.

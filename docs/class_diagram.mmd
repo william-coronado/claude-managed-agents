@@ -2,52 +2,136 @@ classDiagram
     class LookupError
 
     class ResourceNotFoundError {
-        +message
+        +"Raised when existing resource is missing"
     }
-
     ResourceNotFoundError --|> LookupError
 
-    class AgentConfig
-    class EnvironmentConfig
+    class GlobalConfig {
+        +api_key: str
+        +default_model: str
+        +environments_config: str
+        +agents_config: str
+    }
 
-    class Agent {
-        +underlying
-        +__init__(underlying)
+    class EnvironmentConfig {
+        +name: str
+        +description: str
+        +config: dict
+    }
+
+    class AgentConfig {
+        +name: str
+        +system: str
+        +model: Optional[str]
+        +description: str
+        +tools: list
+        +mcp_servers: list
+        +skills: list
+    }
+
+    class config_loader {
+        +load_global_config(path) GlobalConfig
+        +load_environments_config(path) list~EnvironmentConfig~
+        +load_agents_config(path) list~AgentConfig~
     }
 
     class Environment {
-        +underlying
-        +__init__(underlying)
+        -_obj
+        +id
+        +name
+        +__init__(api_obj)
     }
 
-    class agent_module {
-        +create_agent(client, config, default_model, existing) Agent
+    class Agent {
+        -_obj
+        +id
+        +name
+        +__init__(api_obj)
+    }
+
+    class Session {
+        -_obj
+        +id
+        +__init__(api_obj)
     }
 
     class environment_module {
-        +create_environment(client, config, existing) Environment
+        +create_environment(client, config, existing=False) Environment
     }
 
-    class loader_module {
-        +load_resources(client, cfg, env_config_path, agent_config_path, existing) tuple
+    class agent_module {
+        +create_agent(client, config, default_model, existing=False) Agent
+    }
+
+    class session_module {
+        +create_session(client, agent_id, environment_id, title=None) Session
     }
 
     class messaging_module {
         +stream_message(client, session_id, text) str
     }
 
+    class loader_module {
+        +load_resources(client, default_model, env_config_path, agent_config_path, existing=False) tuple
+    }
+
+    class pipeline_module {
+        +run_agent_step(client, agents, envs, agent_name, env_name, prompt) str
+    }
+
+    class orchestrate_main {
+        +main()
+    }
+
+    class se_main {
+        +main()
+    }
+
+    class cc_main {
+        +main()
+    }
+
     class AnthropicClient
 
-    agent_module ..> AgentConfig
-    agent_module ..> Agent
-    agent_module ..> ResourceNotFoundError
+    config_loader ..> GlobalConfig
+    config_loader ..> EnvironmentConfig
+    config_loader ..> AgentConfig
 
     environment_module ..> EnvironmentConfig
     environment_module ..> Environment
     environment_module ..> ResourceNotFoundError
+    environment_module ..> AnthropicClient
 
-    loader_module ..> agent_module
-    loader_module ..> environment_module
-    loader_module ..> ResourceNotFoundError
+    agent_module ..> AgentConfig
+    agent_module ..> Agent
+    agent_module ..> ResourceNotFoundError
+    agent_module ..> AnthropicClient
+
+    session_module ..> Session
+    session_module ..> AnthropicClient
 
     messaging_module ..> AnthropicClient
+
+    loader_module ..> config_loader
+    loader_module ..> environment_module
+    loader_module ..> agent_module
+    loader_module ..> ResourceNotFoundError
+
+    pipeline_module ..> session_module
+    pipeline_module ..> messaging_module
+
+    orchestrate_main ..> config_loader
+    orchestrate_main ..> loader_module
+    orchestrate_main ..> session_module
+    orchestrate_main ..> messaging_module
+    orchestrate_main ..> AnthropicClient
+
+    se_main ..> config_loader
+    se_main ..> loader_module
+    se_main ..> pipeline_module
+    se_main ..> AnthropicClient
+
+    cc_main ..> config_loader
+    cc_main ..> loader_module
+    cc_main ..> pipeline_module
+    cc_main ..> AnthropicClient

@@ -37,8 +37,8 @@ class TestSERunAgentStep:
         envs = {"se-env": _make_mock_env("e1")}
         mock_session = _make_mock_session("sess-1")
 
-        with patch("use_cases.software_engineering.run.create_session", return_value=mock_session) as mock_cs, \
-             patch("use_cases.software_engineering.run.stream_message", return_value="step output") as mock_sm:
+        with patch("src.pipeline.create_session", return_value=mock_session) as mock_cs, \
+             patch("src.pipeline.stream_message", return_value="step output") as mock_sm:
             result = run_agent_step(client, agents, envs, "se-planner", "se-env", "do the thing")
 
         assert result == "step output"
@@ -80,8 +80,8 @@ class TestCCRunAgentStep:
         envs = {"cc-env": _make_mock_env("e2")}
         mock_session = _make_mock_session("sess-2")
 
-        with patch("use_cases.content_creator.run.create_session", return_value=mock_session) as mock_cs, \
-             patch("use_cases.content_creator.run.stream_message", return_value="research output") as mock_sm:
+        with patch("src.pipeline.create_session", return_value=mock_session) as mock_cs, \
+             patch("src.pipeline.stream_message", return_value="research output") as mock_sm:
             result = run_agent_step(client, agents, envs, "cc-researcher", "cc-env", "research AI")
 
         assert result == "research output"
