@@ -1,8 +1,12 @@
+from anthropic import Anthropic
+
+from src.agent import Agent
+from src.environment import Environment
 from src.session import create_session
 from src.messaging import stream_message
 
 
-def run_agent_step(client, agents: dict, envs: dict, agent_name: str, env_name: str, prompt: str) -> str:
+def run_agent_step(client: Anthropic, agents: dict[str, Agent], envs: dict[str, Environment], agent_name: str, env_name: str, prompt: str) -> str:
     print(f"\n{'='*60}")
     print(f"[{agent_name.upper()}]")
     print(f"{'='*60}")

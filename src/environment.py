@@ -24,6 +24,7 @@ def create_environment(client, config: EnvironmentConfig, existing: bool = False
         for page in client.beta.environments.list().iter_pages():
             for env in page.data:
                 if env.name == config.name:
+                    logger.debug("Reusing existing environment '%s'.", config.name)
                     return Environment(env)
         raise ResourceNotFoundError(f"Existing environment '{config.name}' not found")
     api_config = {"type": "cloud", **config.config}
