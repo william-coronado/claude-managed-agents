@@ -34,7 +34,8 @@ claude-managed-agents/
 │   ├── agent.py                    # Managed agent creation/lookup
 │   ├── loader.py                   # load_resources() helper used by all entry points
 │   ├── session.py                  # User session management
-│   └── messaging.py                # SSE streaming and message handling
+│   ├── messaging.py                # SSE streaming and message handling
+│   └── pipeline.py                 # Shared run_agent_step() used by all use-case runners
 ├── use_cases/
 │   ├── software_engineering/       # SE pipeline use case
 │   │   ├── run.py
@@ -85,7 +86,7 @@ python orchestrate.py \
   --prompt "Explain the CAP theorem in one paragraph."
 ```
 
-Use `--existing` to reuse cloud resources already created in a previous run instead of provisioning new ones:
+Use `--existing` to reuse cloud resources already created in a previous run instead of provisioning new ones. If a reused agent's stored model differs from the current config, a warning is logged:
 
 ```bash
 python orchestrate.py \
@@ -178,7 +179,7 @@ agents:
     skills: []
 ```
 
-To create your own pipeline, add a new directory under `use_cases/`, provide `config/environments.yaml` and `config/agents.yaml`, and write a `run.py` that chains agent outputs using the `src` modules.
+To create your own pipeline, add a new directory under `use_cases/`, provide `config/environments.yaml` and `config/agents.yaml`, and write a `run.py` that imports `run_agent_step` from `src.pipeline` and chains agent outputs.
 
 ## Architecture
 
@@ -188,9 +189,11 @@ orchestrate.py / use_cases/*/run.py
         ├── config_loader.py   load & validate YAML → dataclasses
         ├── loader.py          create all environments + agents; collect errors
         │       ├── environment.py   create or reuse cloud environment
-        │       └── agent.py        create or reuse managed agent
-        ├── session.py         open a user session
-        └── messaging.py       stream SSE events, print output, return text
+        │       └── agent.py        create or reuse managed agent (warns on model drift)
+        ├── pipeline.py        run_agent_step() — shared step runner for all pipelines
+        │       ├── session.py       open a user session
+        │       └── messaging.py     stream SSE events, print output, return text
+        └── messaging.py       (also used directly by orchestrate.py)
 ```
 
 Each layer maps directly to an Anthropic beta API:

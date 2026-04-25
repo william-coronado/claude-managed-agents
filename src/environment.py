@@ -1,5 +1,9 @@
+import logging
+
 from src.config_loader import EnvironmentConfig
 from src.exceptions import ResourceNotFoundError
+
+logger = logging.getLogger(__name__)
 
 
 class Environment:
