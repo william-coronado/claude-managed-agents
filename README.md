@@ -220,6 +220,14 @@ python download_outputs.py --session-id <session-id> --output-dir ./outputs
 
 Both use `src/downloads.py` → `download_session_outputs(client, session_id, output_dir)`, which calls `client.beta.files.list(scope_id=session_id)` to enumerate session-scoped files and saves each with `write_to_file()`.
 
+## Sequence Diagrams
+
+Focused flow diagrams are available in:
+
+- [Orchestrate flow](docs/sequence_diagram_orchestrate.mmd)
+- [Content Creator pipeline flow](docs/sequence_diagram_content_creator.mmd)
+- [Software Engineering pipeline flow](docs/sequence_diagram_software_engineering.mmd)
+
 ## Architecture
 
 ```

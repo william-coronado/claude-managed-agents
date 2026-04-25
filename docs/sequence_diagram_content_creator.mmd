@@ -7,30 +7,61 @@ sequenceDiagram
     participant P as run_agent_step
     participant S as create_session
     participant M as stream_message
+    participant D as download_session_outputs
+    participant F as Anthropic Files API
 
-    User ->> C: python use_cases/content_creator/run.py --topic [--existing]
+    User ->> C: python use_cases/content_creator/run.py --topic [--existing] [--output-dir DIR]
     C ->> CL: load_global_config(config)
     CL -->> C: GlobalConfig
     C ->> A: Anthropic(api_key)
     C ->> L: load_resources(client, default_model, ENV_CONFIG, AGENT_CONFIG, existing)
     L -->> C: envs_dict, agents_dict
 
-    C ->> P: run_agent_step(cc-researcher, cc-env, research_prompt)
+    C ->> P: run_agent_step(cc-researcher, cc-env, research_prompt, output_dir)
     P ->> S: create_session(...)
     P ->> M: stream_message(...)
     M -->> P: research_output
+    alt output_dir is provided
+        P ->> D: download_session_outputs(client, session.id, output_dir)
+        D ->> F: files.list(scope_id=session.id)
+        loop each file
+            D ->> F: files.download(file_id).write_to_file(dest)
+        end
+        D -->> P: downloaded_count
+    end
     P -->> C: research_output
 
-    C ->> P: run_agent_step(cc-author, cc-env, prompt + research_output)
+    C ->> P: run_agent_step(cc-author, cc-env, prompt + research_output, output_dir)
     P ->> S: create_session(...)
     P ->> M: stream_message(...)
     M -->> P: article_output
+    alt output_dir is provided
+        P ->> D: download_session_outputs(client, session.id, output_dir)
+        D ->> F: files.list(scope_id=session.id)
+        loop each file
+            D ->> F: files.download(file_id).write_to_file(dest)
+        end
+        D -->> P: downloaded_count
+    end
     P -->> C: article_output
 
-    C ->> P: run_agent_step(cc-editor, cc-env, prompt + article_output)
+    C ->> P: run_agent_step(cc-editor, cc-env, prompt + article_output, output_dir)
     P ->> S: create_session(...)
     P ->> M: stream_message(...)
     M -->> P: final_output
+    alt output_dir is provided
+        P ->> D: download_session_outputs(client, session.id, output_dir)
+        D ->> F: files.list(scope_id=session.id)
+        loop each file
+            D ->> F: files.download(file_id).write_to_file(dest)
+        end
+        D -->> P: downloaded_count
+    end
     P -->> C: final_output
 
+    alt missing agent/env key in run_agent_step
+        P -->> C: KeyError
+        C -->> User: SystemExit("Error: ...")
+    else success
     C -->> User: final edited article
+    end

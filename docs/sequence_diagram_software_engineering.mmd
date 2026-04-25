@@ -7,36 +7,75 @@ sequenceDiagram
     participant P as run_agent_step
     participant S as create_session
     participant M as stream_message
+    participant D as download_session_outputs
+    participant F as Anthropic Files API
 
-    User ->> SE: python use_cases/software_engineering/run.py --task [--existing]
+    User ->> SE: python use_cases/software_engineering/run.py --task [--existing] [--output-dir DIR]
     SE ->> CL: load_global_config(config)
     CL -->> SE: GlobalConfig
     SE ->> A: Anthropic(api_key)
     SE ->> L: load_resources(client, default_model, ENV_CONFIG, AGENT_CONFIG, existing)
     L -->> SE: envs_dict, agents_dict
 
-    SE ->> P: run_agent_step(se-planner, se-env, plan_prompt)
+    SE ->> P: run_agent_step(se-planner, se-env, plan_prompt, output_dir)
     P ->> S: create_session(...)
     P ->> M: stream_message(...)
     M -->> P: plan_output
+    alt output_dir is provided
+        P ->> D: download_session_outputs(client, session.id, output_dir)
+        D ->> F: files.list(scope_id=session.id)
+        loop each file
+            D ->> F: files.download(file_id).write_to_file(dest)
+        end
+        D -->> P: downloaded_count
+    end
     P -->> SE: plan_output
 
-    SE ->> P: run_agent_step(se-coder, se-env, prompt + plan_output)
+    SE ->> P: run_agent_step(se-coder, se-env, prompt + plan_output, output_dir)
     P ->> S: create_session(...)
     P ->> M: stream_message(...)
     M -->> P: code_output
+    alt output_dir is provided
+        P ->> D: download_session_outputs(client, session.id, output_dir)
+        D ->> F: files.list(scope_id=session.id)
+        loop each file
+            D ->> F: files.download(file_id).write_to_file(dest)
+        end
+        D -->> P: downloaded_count
+    end
     P -->> SE: code_output
 
-    SE ->> P: run_agent_step(se-reviewer, se-env, prompt + code_output)
+    SE ->> P: run_agent_step(se-reviewer, se-env, prompt + code_output, output_dir)
     P ->> S: create_session(...)
     P ->> M: stream_message(...)
     M -->> P: review_output
+    alt output_dir is provided
+        P ->> D: download_session_outputs(client, session.id, output_dir)
+        D ->> F: files.list(scope_id=session.id)
+        loop each file
+            D ->> F: files.download(file_id).write_to_file(dest)
+        end
+        D -->> P: downloaded_count
+    end
     P -->> SE: review_output
 
-    SE ->> P: run_agent_step(se-tester, se-env, prompt + code_output + review_output)
+    SE ->> P: run_agent_step(se-tester, se-env, prompt + code_output + review_output, output_dir)
     P ->> S: create_session(...)
     P ->> M: stream_message(...)
     M -->> P: test_output
+    alt output_dir is provided
+        P ->> D: download_session_outputs(client, session.id, output_dir)
+        D ->> F: files.list(scope_id=session.id)
+        loop each file
+            D ->> F: files.download(file_id).write_to_file(dest)
+        end
+        D -->> P: downloaded_count
+    end
     P -->> SE: test_output
 
+    alt missing agent/env key in run_agent_step
+        P -->> SE: KeyError
+        SE -->> User: SystemExit("Error: ...")
+    else success
     SE -->> User: tester output streamed
+    end
