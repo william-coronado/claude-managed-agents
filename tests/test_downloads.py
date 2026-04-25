@@ -1,99 +1,139 @@
 """Unit tests for src/downloads.py and download_outputs.py CLI."""
 import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 
 def _make_client():
     return MagicMock()
 
 
-def _make_file_meta(id_: str, filename: str, downloadable=True):
-    m = MagicMock()
-    m.id = id_
-    m.filename = filename
-    m.downloadable = downloadable
-    return m
+def _make_write_event(file_path: str, content: str):
+    ev = MagicMock()
+    ev.type = "agent.tool_use"
+    ev.name = "write"
+    ev.input = {"file_path": file_path, "content": content}
+    return ev
+
+
+def _make_other_event(type_: str = "agent.message"):
+    ev = MagicMock()
+    ev.type = type_
+    ev.name = None
+    return ev
+
+
+def _make_bash_event(command: str):
+    ev = MagicMock()
+    ev.type = "agent.tool_use"
+    ev.name = "bash"
+    ev.input = {"command": command}
+    return ev
 
 
 class TestDownloadSessionOutputs:
-    def _call(self, client, session_id, output_dir):
+    def _call(self, client, session_id, output_dir, remote_dir=None):
         from src.downloads import download_session_outputs
+        if remote_dir is not None:
+            return download_session_outputs(client, session_id, output_dir, remote_dir)
         return download_session_outputs(client, session_id, output_dir)
 
-    def test_downloads_all_downloadable_files(self, tmp_path):
+    def test_downloads_all_output_files(self, tmp_path):
         client = _make_client()
-        files = [
-            _make_file_meta("f1", "result.py", downloadable=True),
-            _make_file_meta("f2", "report.md", downloadable=True),
+        client.beta.sessions.events.list.return_value = [
+            _make_write_event("/mnt/session/outputs/result.py", "print('ok')"),
+            _make_write_event("/mnt/session/outputs/report.md", "# Report"),
         ]
-        client.beta.files.list.return_value = files
-        mock_binary = MagicMock()
-        client.beta.files.download.return_value = mock_binary
 
         count = self._call(client, "sess-1", tmp_path)
 
         assert count == 2
-        client.beta.files.list.assert_called_once_with(scope_id="sess-1")
-        assert client.beta.files.download.call_count == 2
-        client.beta.files.download.assert_any_call("f1")
-        client.beta.files.download.assert_any_call("f2")
-        mock_binary.write_to_file.assert_any_call(tmp_path / "result.py")
-        mock_binary.write_to_file.assert_any_call(tmp_path / "report.md")
+        client.beta.sessions.events.list.assert_called_once_with("sess-1")
+        assert (tmp_path / "result.py").read_text() == "print('ok')"
+        assert (tmp_path / "report.md").read_text() == "# Report"
 
-    def test_skips_non_downloadable_files(self, tmp_path):
+    def test_skips_non_write_tool_events(self, tmp_path):
         client = _make_client()
-        files = [
-            _make_file_meta("f1", "ok.py", downloadable=True),
-            _make_file_meta("f2", "blocked.bin", downloadable=False),
+        client.beta.sessions.events.list.return_value = [
+            _make_other_event("agent.message"),
+            _make_bash_event("ls /mnt/session/outputs/"),
+            _make_write_event("/mnt/session/outputs/result.py", "data"),
         ]
-        client.beta.files.list.return_value = files
-        client.beta.files.download.return_value = MagicMock()
 
         count = self._call(client, "sess-2", tmp_path)
 
         assert count == 1
-        client.beta.files.download.assert_called_once_with("f1")
+        assert (tmp_path / "result.py").read_text() == "data"
 
-    def test_downloadable_none_treated_as_downloadable(self, tmp_path):
+    def test_skips_files_outside_remote_dir(self, tmp_path):
         client = _make_client()
-        files = [_make_file_meta("f1", "file.txt", downloadable=None)]
-        client.beta.files.list.return_value = files
-        client.beta.files.download.return_value = MagicMock()
+        client.beta.sessions.events.list.return_value = [
+            _make_write_event("/mnt/session/uploads/input.py", "upload"),
+            _make_write_event("/mnt/session/outputs/out.py", "output"),
+        ]
 
         count = self._call(client, "sess-3", tmp_path)
 
         assert count == 1
-        client.beta.files.download.assert_called_once_with("f1")
+        assert (tmp_path / "out.py").read_text() == "output"
+        assert not (tmp_path / "input.py").exists()
 
-    def test_returns_zero_when_no_files(self, tmp_path):
+    def test_returns_zero_when_no_write_events(self, tmp_path):
         client = _make_client()
-        client.beta.files.list.return_value = []
+        client.beta.sessions.events.list.return_value = [
+            _make_other_event("session.status_idle"),
+        ]
 
         count = self._call(client, "sess-4", tmp_path)
 
         assert count == 0
-        client.beta.files.download.assert_not_called()
 
     def test_creates_output_dir_if_missing(self, tmp_path):
         new_dir = tmp_path / "nested" / "output"
         client = _make_client()
-        client.beta.files.list.return_value = []
+        client.beta.sessions.events.list.return_value = []
 
         self._call(client, "sess-5", new_dir)
 
         assert new_dir.is_dir()
 
-    def test_write_to_file_called_with_correct_path(self, tmp_path):
+    def test_preserves_subdirectory_structure(self, tmp_path):
         client = _make_client()
-        files = [_make_file_meta("f1", "my_file.py")]
-        client.beta.files.list.return_value = files
-        mock_binary = MagicMock()
-        client.beta.files.download.return_value = mock_binary
+        client.beta.sessions.events.list.return_value = [
+            _make_write_event("/mnt/session/outputs/todo/main.py", "# main"),
+            _make_write_event("/mnt/session/outputs/todo/utils/helpers.py", "# helpers"),
+        ]
 
-        self._call(client, "sess-6", tmp_path / "out")
+        self._call(client, "sess-6", tmp_path)
 
-        mock_binary.write_to_file.assert_called_once_with(tmp_path / "out" / "my_file.py")
+        assert (tmp_path / "todo" / "main.py").read_text() == "# main"
+        assert (tmp_path / "todo" / "utils" / "helpers.py").read_text() == "# helpers"
+
+    def test_custom_remote_dir_filters_and_strips_prefix(self, tmp_path):
+        client = _make_client()
+        client.beta.sessions.events.list.return_value = [
+            _make_write_event("/mnt/session/outputs/todo/main.py", "# main"),
+            _make_write_event("/mnt/session/outputs/notes/readme.md", "# notes"),
+        ]
+
+        from src.downloads import download_session_outputs
+        count = download_session_outputs(client, "sess-7", tmp_path, "/mnt/session/outputs/todo")
+
+        assert count == 1
+        assert (tmp_path / "main.py").read_text() == "# main"
+        assert not (tmp_path / "readme.md").exists()
+
+    def test_remote_dir_without_trailing_slash_is_normalised(self, tmp_path):
+        client = _make_client()
+        client.beta.sessions.events.list.return_value = [
+            _make_write_event("/mnt/session/outputs/result.py", "data"),
+        ]
+
+        from src.downloads import download_session_outputs
+        count = download_session_outputs(client, "sess-8", tmp_path, "/mnt/session/outputs")
+
+        assert count == 1
+        assert (tmp_path / "result.py").read_text() == "data"
 
 
 # ---------------------------------------------------------------------------
@@ -115,4 +155,21 @@ class TestDownloadOutputsCLI:
                                 "--output-dir", str(tmp_path)]):
             download_outputs.main()
 
-        mock_dl.assert_called_once_with(mock_client, "sess-99", Path(str(tmp_path)))
+        mock_dl.assert_called_once_with(mock_client, "sess-99", Path(str(tmp_path)), "/mnt/session/outputs/")
+
+    def test_main_passes_custom_remote_dir(self, tmp_path):
+        import download_outputs
+
+        mock_client = MagicMock()
+        mock_cfg = MagicMock(api_key=None)
+
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}), \
+             patch("download_outputs.load_global_config", return_value=mock_cfg), \
+             patch("download_outputs.Anthropic", return_value=mock_client), \
+             patch("download_outputs.download_session_outputs") as mock_dl, \
+             patch("sys.argv", ["download_outputs.py", "--session-id", "sess-99",
+                                "--output-dir", str(tmp_path),
+                                "--remote-dir", "/mnt/session/outputs/todo/"]):
+            download_outputs.main()
+
+        mock_dl.assert_called_once_with(mock_client, "sess-99", Path(str(tmp_path)), "/mnt/session/outputs/todo/")

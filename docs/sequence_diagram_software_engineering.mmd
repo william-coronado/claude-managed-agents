@@ -7,8 +7,6 @@ sequenceDiagram
     participant P as run_agent_step
     participant S as create_session
     participant M as stream_message
-    participant D as download_session_outputs
-    participant F as Anthropic Files API
 
     User ->> SE: python use_cases/software_engineering/run.py --task [--existing] [--output-dir DIR]
     SE ->> CL: load_global_config(config)
@@ -19,19 +17,11 @@ sequenceDiagram
 
     SE ->> P: run_agent_step(se-planner, se-env, plan_prompt, output_dir)
     P ->> S: create_session(...)
-    P ->> M: stream_message(...)
+    P ->> M: stream_message(..., output_dir=output_dir / "se-planner")
     alt stream succeeds
         M -->> P: plan_output
     else stream raises
         M -->> P: RuntimeError
-    end
-    alt output_dir is provided (finally)
-        P ->> D: download_session_outputs(client, session.id, output_dir / "se-planner")
-        D ->> F: files.list(scope_id=session.id)
-        loop each file
-            D ->> F: files.download(file_id).write_to_file(dest)
-        end
-        D -->> P: downloaded_count
     end
     alt stream succeeded
         P -->> SE: plan_output
@@ -41,19 +31,11 @@ sequenceDiagram
 
     SE ->> P: run_agent_step(se-coder, se-env, prompt + plan_output, output_dir)
     P ->> S: create_session(...)
-    P ->> M: stream_message(...)
+    P ->> M: stream_message(..., output_dir=output_dir / "se-coder")
     alt stream succeeds
         M -->> P: code_output
     else stream raises
         M -->> P: RuntimeError
-    end
-    alt output_dir is provided (finally)
-        P ->> D: download_session_outputs(client, session.id, output_dir / "se-coder")
-        D ->> F: files.list(scope_id=session.id)
-        loop each file
-            D ->> F: files.download(file_id).write_to_file(dest)
-        end
-        D -->> P: downloaded_count
     end
     alt stream succeeded
         P -->> SE: code_output
@@ -63,19 +45,11 @@ sequenceDiagram
 
     SE ->> P: run_agent_step(se-reviewer, se-env, prompt + code_output, output_dir)
     P ->> S: create_session(...)
-    P ->> M: stream_message(...)
+    P ->> M: stream_message(..., output_dir=output_dir / "se-reviewer")
     alt stream succeeds
         M -->> P: review_output
     else stream raises
         M -->> P: RuntimeError
-    end
-    alt output_dir is provided (finally)
-        P ->> D: download_session_outputs(client, session.id, output_dir / "se-reviewer")
-        D ->> F: files.list(scope_id=session.id)
-        loop each file
-            D ->> F: files.download(file_id).write_to_file(dest)
-        end
-        D -->> P: downloaded_count
     end
     alt stream succeeded
         P -->> SE: review_output
@@ -85,25 +59,21 @@ sequenceDiagram
 
     SE ->> P: run_agent_step(se-tester, se-env, prompt + code_output + review_output, output_dir)
     P ->> S: create_session(...)
-    P ->> M: stream_message(...)
+    P ->> M: stream_message(..., output_dir=output_dir / "se-tester")
     alt stream succeeds
         M -->> P: test_output
     else stream raises
         M -->> P: RuntimeError
-    end
-    alt output_dir is provided (finally)
-        P ->> D: download_session_outputs(client, session.id, output_dir / "se-tester")
-        D ->> F: files.list(scope_id=session.id)
-        loop each file
-            D ->> F: files.download(file_id).write_to_file(dest)
-        end
-        D -->> P: downloaded_count
     end
     alt stream succeeded
         P -->> SE: test_output
     else stream failed
         P -->> SE: RuntimeError
     end
+
+    Note over M: During streaming, write tool events are captured in real time
+    Note over M: Only writes under /mnt/session/outputs/ are saved to output_dir
+    Note over P: No post-step download/finally step in run_agent_step
 
     alt missing agent/env key in run_agent_step
         P -->> SE: KeyError

@@ -11,7 +11,7 @@ This project provides a thin, configuration-driven layer on top of the Anthropic
 - Define agents declaratively (system prompt, model, tools, MCP servers, skills)
 - Stream agent responses to stdout in real-time via Server-Sent Events
 - Chain agents sequentially, passing each output as input to the next
-- Download files the agent wrote to `/mnt/session/outputs/` to a local directory
+- Capture files the agent writes to `/mnt/session/outputs/` to a local directory in real time
 
 **Included use cases:**
 - **Software Engineering pipeline** — planner → coder → reviewer → tester
@@ -120,7 +120,7 @@ python use_cases/software_engineering/run.py \
   --task "Build a command-line todo app with file persistence and unit tests."
 ```
 
-Add `--output-dir` to download any files the agents wrote to `/mnt/session/outputs/` after each step:
+Add `--output-dir` to capture any files the agents write to `/mnt/session/outputs/` during each step:
 
 ```bash
 python use_cases/software_engineering/run.py \
@@ -128,7 +128,7 @@ python use_cases/software_engineering/run.py \
   --output-dir ./se-outputs
 ```
 
-Files are saved under `<output-dir>/<agent-name>/` to keep each step's outputs separate (e.g. `./se-outputs/se-coder/app.py`, `./se-outputs/se-tester/test_app.py`). Downloads run even if a step's streaming fails.
+Files are captured in real time from the SSE stream and saved under `<output-dir>/<agent-name>/` to keep each step's outputs separate (e.g. `./se-outputs/se-coder/app.py`, `./se-outputs/se-tester/test_app.py`).
 
 **Pipeline stages:**
 1. `se-planner` — produces a detailed technical architecture plan
@@ -147,7 +147,7 @@ python use_cases/content_creator/run.py \
   --topic "The impact of AI agents on software development in 2026."
 ```
 
-Add `--output-dir` to download any files the agents wrote to `/mnt/session/outputs/` after each step:
+Add `--output-dir` to capture any files the agents write to `/mnt/session/outputs/` during each step:
 
 ```bash
 python use_cases/content_creator/run.py \
@@ -155,7 +155,7 @@ python use_cases/content_creator/run.py \
   --output-dir ./cc-outputs
 ```
 
-Files are saved under `<output-dir>/<agent-name>/` (e.g. `./cc-outputs/cc-author/article.md`). Downloads run even if a step's streaming fails.
+Files are captured in real time from the SSE stream and saved under `<output-dir>/<agent-name>/` (e.g. `./cc-outputs/cc-author/article.md`).
 
 **Pipeline stages:**
 1. `cc-researcher` — gathers facts, statistics, and sources via web search
@@ -208,21 +208,27 @@ To create your own pipeline, add a new directory under `use_cases/`, provide `co
 
 ### Downloading session output files
 
-Files an agent writes to `/mnt/session/outputs/` inside its container are registered against the session in the Files API. You can retrieve them two ways:
+Files an agent writes to `/mnt/session/outputs/` are captured two ways:
 
-**Via `--output-dir` in any pipeline runner** (downloads after each step automatically):
+**Via `--output-dir` in any pipeline runner** (captured in real time during each step):
 
 ```bash
 python use_cases/software_engineering/run.py --task "..." --output-dir ./outputs
 ```
 
-**Via the standalone script** (for any session by ID, including past ones):
+**Via the standalone script** (for any past session by ID):
 
 ```bash
 python download_outputs.py --session-id <session-id> --output-dir ./outputs
+# Optionally narrow to a specific subdirectory:
+python download_outputs.py --session-id <session-id> --output-dir ./outputs --remote-dir /mnt/session/outputs/todo/
 ```
 
-Both use `src/downloads.py` → `download_session_outputs(client, session_id, output_dir)`, which calls `client.beta.files.list(scope_id=session_id)` to enumerate session-scoped files and saves each with `write_to_file()`. When called from a pipeline step, `output_dir` is automatically namespaced as `<base_dir>/<agent_name>/` to prevent filename collisions across steps. Downloads run even if a step's streaming raises an error (`try/finally` in `run_agent_step`).
+**How it works:** The managed agents platform does not expose agent-created files through any post-session API. Instead, file content is read from `agent.tool_use` SSE events — when the agent calls its built-in `write` tool, the event payload contains both `file_path` and `content`. During a live pipeline run, `stream_message()` intercepts these events and saves files immediately. For past sessions, `download_outputs.py` replays all events via `client.beta.sessions.events.list()` to extract the same write calls.
+
+Files are saved under `<output-dir>/<agent-name>/` when run from a pipeline step, preserving any subdirectory structure under the remote dir (e.g. an agent writing to `/mnt/session/outputs/todo/main.py` with `--output-dir ./out` saves to `./out/<agent-name>/todo/main.py`).
+
+> **Note:** Only files written via the agent's `write` tool are captured. Files written via bash commands (e.g. `echo ... > file`) are not.
 
 ## Sequence Diagrams
 
@@ -253,8 +259,8 @@ Each layer maps directly to an Anthropic beta API:
 - `client.beta.environments` — execution sandboxes
 - `client.beta.agents` — stateful agent definitions
 - `client.beta.sessions` — per-user conversation contexts
-- `client.beta.sessions.events.stream` — SSE response stream
-- `client.beta.files` — enumerate and download session-scoped output files
+- `client.beta.sessions.events.stream` — SSE response stream (also source of `write` tool events for file capture)
+- `client.beta.sessions.events.list` — replay past events (used by `download_outputs.py` for post-session retrieval)
 
 ### Error handling
 
@@ -266,7 +272,7 @@ Each layer maps directly to an Anthropic beta API:
 pytest tests/
 ```
 
-69 tests covering config loading, environment/agent creation and lookup, session handling, message streaming, `load_resources` error collection, pipeline orchestration, session output file downloads, and the `download_outputs.py` CLI. All tests mock the Anthropic client and run in under one second.
+77 tests covering config loading, environment/agent creation and lookup, session handling, message streaming, real-time file capture from write tool events, `load_resources` error collection, pipeline orchestration, event-replay file download, and the `download_outputs.py` CLI. All tests mock the Anthropic client and run in under one second.
 
 ## License
 

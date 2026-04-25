@@ -5,7 +5,6 @@ from typing import Optional
 from anthropic import Anthropic
 
 from src.agent import Agent
-from src.downloads import download_session_outputs
 from src.environment import Environment
 from src.session import create_session
 from src.messaging import stream_message
@@ -30,9 +29,5 @@ def run_agent_step(
     agent = agents[agent_name]
     env = envs[env_name]
     session = create_session(client, agent.id, env.id, title=prompt[:80])
-    try:
-        result = stream_message(client, session.id, prompt)
-    finally:
-        if output_dir is not None:
-            download_session_outputs(client, session.id, output_dir / agent_name)
-    return result
+    agent_output_dir = output_dir / agent_name if output_dir is not None else None
+    return stream_message(client, session.id, prompt, output_dir=agent_output_dir)

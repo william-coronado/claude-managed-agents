@@ -59,9 +59,9 @@ This is a Python scaffolding framework for orchestrating **Claude Managed Agents
 | `agent.py` | Thin wrapper around `client.beta.agents` API; supports create-new or find-existing-by-name; logs a warning when `--existing` reuses an agent whose stored model differs from the current config |
 | `loader.py` | `load_resources()` helper used by all entry points — iterates over all environments and agents, collects every `ResourceNotFoundError`, and raises a single `SystemExit` listing all missing resources |
 | `session.py` | Creates a session via `client.beta.sessions` API; sanitizes titles by stripping non-printable Unicode |
-| `messaging.py` | Opens an SSE stream (`client.beta.sessions.events.stream`), sends a user message, prints output, returns accumulated text; logs skipped non-text blocks at DEBUG level |
-| `pipeline.py` | Shared `run_agent_step()` function used by all use-case pipeline runners — creates a session, streams a prompt (wrapped in `try/finally`), and optionally downloads session output files into `output_dir/<agent_name>/` |
-| `downloads.py` | `download_session_outputs()` — lists files scoped to a session via `client.beta.files.list(scope_id=)` and writes each to a local directory using `BinaryAPIResponse.write_to_file()` |
+| `messaging.py` | Opens an SSE stream (`client.beta.sessions.events.stream`), sends a user message, prints output, returns accumulated text; intercepts `agent.tool_use` events with `name="write"` and saves their content to `output_dir` when provided; logs skipped non-text blocks at DEBUG level |
+| `pipeline.py` | Shared `run_agent_step()` function used by all use-case pipeline runners — creates a session and calls `stream_message()` with `output_dir=<output_dir>/<agent_name>` so file capture happens in real time during streaming |
+| `downloads.py` | `download_session_outputs()` — replays session events via `client.beta.sessions.events.list()`, finds `agent.tool_use` events with `name="write"` targeting `remote_dir`, and writes their content locally; used by `download_outputs.py` for post-session retrieval |
 
 ### Configuration hierarchy
 
@@ -76,20 +76,21 @@ Both `software_engineering/run.py` and `content_creator/run.py` follow the same 
 1. Load config and construct an `Anthropic` client
 2. Call `load_resources()` to create (or look up) all environments and agents; any missing resources are reported together before exiting
 3. Run agents sequentially, passing the output of each step as input to the next via `run_agent_step()`
-4. If `--output-dir` is provided, `run_agent_step()` downloads session outputs into `<output_dir>/<agent_name>/` after each step — even if streaming raised an error
+4. If `--output-dir` is provided, `run_agent_step()` passes `output_dir/<agent_name>` to `stream_message()`, which captures files in real time as the agent writes them during streaming
 
-`run_agent_step()` lives in `src/pipeline.py` and is imported by both runners. It creates a session, calls `stream_message()`, and optionally downloads output files via `src/downloads.py`.
+`run_agent_step()` lives in `src/pipeline.py` and is imported by both runners. It creates a session and calls `stream_message()` with the namespaced output directory.
+
+**How file capture works:** The managed agents platform does not expose files agents create at runtime through any post-session API (`sessions.resources.list` only returns explicitly mounted inputs). Instead, file content is captured from `agent.tool_use` SSE events during streaming — the agent's built-in `write` tool emits an event containing both `file_path` and `content`. `stream_message()` intercepts these events and writes the content locally. `download_outputs.py` achieves the same result post-session by replaying events via `sessions.events.list()`.
 
 ### Anthropic SDK beta APIs used
 
 - `client.beta.environments.create / list`
 - `client.beta.agents.create / list`
 - `client.beta.sessions.create`
-- `client.beta.sessions.events.stream` (SSE)
+- `client.beta.sessions.events.stream` (SSE) — also source of `agent.tool_use` write events used for real-time file capture
 - `client.beta.sessions.events.send`
-- `client.beta.files.list` (with `scope_id` to enumerate session output files)
-- `client.beta.files.download` (to retrieve file content)
+- `client.beta.sessions.events.list` (to replay past events for post-session file retrieval in `download_outputs.py`)
 
 ### Test approach
 
-All 69 tests are unit tests that mock the Anthropic client; there are no integration tests hitting the real API. Tests live in `tests/` and mirror the `src/` module structure, including `tests/test_loader.py` which verifies the bulk-error-collection contract in `load_resources()`, `tests/test_downloads.py` which covers `download_session_outputs()` and the `download_outputs.py` CLI, and `TestRunAgentStepOutputDownload` in `tests/test_use_case_run_agent_step.py` which verifies the subdirectory namespacing and `try/finally` download guarantee. Tests for `run_agent_step()` patch `src.pipeline.create_session`, `src.pipeline.stream_message`, and `src.pipeline.download_session_outputs`.
+All 77 tests are unit tests that mock the Anthropic client; there are no integration tests hitting the real API. Tests live in `tests/` and mirror the `src/` module structure, including `tests/test_loader.py` which verifies the bulk-error-collection contract in `load_resources()`, `tests/test_messaging.py` which covers real-time file capture from `write` tool events, `tests/test_downloads.py` which covers `download_session_outputs()` (event-replay approach) and the `download_outputs.py` CLI, and `TestRunAgentStepOutputCapture` in `tests/test_use_case_run_agent_step.py` which verifies the subdirectory namespacing passed to `stream_message()`. Tests for `run_agent_step()` patch `src.pipeline.create_session` and `src.pipeline.stream_message`.

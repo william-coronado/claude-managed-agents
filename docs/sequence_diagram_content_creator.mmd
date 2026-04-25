@@ -7,8 +7,6 @@ sequenceDiagram
     participant P as run_agent_step
     participant S as create_session
     participant M as stream_message
-    participant D as download_session_outputs
-    participant F as Anthropic Files API
 
     User ->> C: python use_cases/content_creator/run.py --topic [--existing] [--output-dir DIR]
     C ->> CL: load_global_config(config)
@@ -19,19 +17,11 @@ sequenceDiagram
 
     C ->> P: run_agent_step(cc-researcher, cc-env, research_prompt, output_dir)
     P ->> S: create_session(...)
-    P ->> M: stream_message(...)
+    P ->> M: stream_message(..., output_dir=output_dir / "cc-researcher")
     alt stream succeeds
         M -->> P: research_output
     else stream raises
         M -->> P: RuntimeError
-    end
-    alt output_dir is provided (finally)
-        P ->> D: download_session_outputs(client, session.id, output_dir / "cc-researcher")
-        D ->> F: files.list(scope_id=session.id)
-        loop each file
-            D ->> F: files.download(file_id).write_to_file(dest)
-        end
-        D -->> P: downloaded_count
     end
     alt stream succeeded
         P -->> C: research_output
@@ -41,19 +31,11 @@ sequenceDiagram
 
     C ->> P: run_agent_step(cc-author, cc-env, prompt + research_output, output_dir)
     P ->> S: create_session(...)
-    P ->> M: stream_message(...)
+    P ->> M: stream_message(..., output_dir=output_dir / "cc-author")
     alt stream succeeds
         M -->> P: article_output
     else stream raises
         M -->> P: RuntimeError
-    end
-    alt output_dir is provided (finally)
-        P ->> D: download_session_outputs(client, session.id, output_dir / "cc-author")
-        D ->> F: files.list(scope_id=session.id)
-        loop each file
-            D ->> F: files.download(file_id).write_to_file(dest)
-        end
-        D -->> P: downloaded_count
     end
     alt stream succeeded
         P -->> C: article_output
@@ -63,25 +45,21 @@ sequenceDiagram
 
     C ->> P: run_agent_step(cc-editor, cc-env, prompt + article_output, output_dir)
     P ->> S: create_session(...)
-    P ->> M: stream_message(...)
+    P ->> M: stream_message(..., output_dir=output_dir / "cc-editor")
     alt stream succeeds
         M -->> P: final_output
     else stream raises
         M -->> P: RuntimeError
-    end
-    alt output_dir is provided (finally)
-        P ->> D: download_session_outputs(client, session.id, output_dir / "cc-editor")
-        D ->> F: files.list(scope_id=session.id)
-        loop each file
-            D ->> F: files.download(file_id).write_to_file(dest)
-        end
-        D -->> P: downloaded_count
     end
     alt stream succeeded
         P -->> C: final_output
     else stream failed
         P -->> C: RuntimeError
     end
+
+    Note over M: During streaming, write tool events are captured in real time
+    Note over M: Only writes under /mnt/session/outputs/ are saved to output_dir
+    Note over P: No post-step download/finally step in run_agent_step
 
     alt missing agent/env key in run_agent_step
         P -->> C: KeyError

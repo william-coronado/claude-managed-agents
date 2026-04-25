@@ -14,6 +14,8 @@ def main():
     )
     parser.add_argument("--session-id", required=True, help="ID of the session to download outputs from")
     parser.add_argument("--output-dir", required=True, metavar="DIR", help="Local directory to save downloaded files")
+    parser.add_argument("--remote-dir", default="/mnt/session/outputs/",
+                        help="Remote directory to download from (default: /mnt/session/outputs/)")
     parser.add_argument("--config", default="config/global.yaml", help="Path to global config")
     args = parser.parse_args()
 
@@ -23,7 +25,7 @@ def main():
         raise SystemExit("Error: ANTHROPIC_API_KEY not set in environment or config")
 
     client = Anthropic(api_key=api_key)
-    download_session_outputs(client, args.session_id, Path(args.output_dir))
+    download_session_outputs(client, args.session_id, Path(args.output_dir), args.remote_dir)
 
 
 if __name__ == "__main__":
