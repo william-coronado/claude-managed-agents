@@ -5,6 +5,7 @@ Content Creator use case — sequential pipeline:
 import os
 import sys
 import argparse
+from pathlib import Path
 
 # Allow running from repo root
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -25,7 +26,10 @@ def main():
     parser.add_argument("--topic", required=True, help="Topic to research and write about")
     parser.add_argument("--config", default=GLOBAL_CONFIG, help="Path to global config")
     parser.add_argument("--existing", action="store_true", help="Reuse existing resources")
+    parser.add_argument("--output-dir", metavar="DIR", help="Download session output files to this local directory")
     args = parser.parse_args()
+
+    output_dir = Path(args.output_dir) if args.output_dir else None
 
     cfg = load_global_config(args.config)
     api_key = os.environ.get("ANTHROPIC_API_KEY") or cfg.api_key
@@ -43,7 +47,7 @@ def main():
             "Research this topic thoroughly. Gather facts, statistics, key developments, "
             "and notable sources. Produce a structured research brief."
         )
-        research_output = run_agent_step(client, agents, envs, "cc-researcher", "cc-env", research_prompt)
+        research_output = run_agent_step(client, agents, envs, "cc-researcher", "cc-env", research_prompt, output_dir)
 
         # Step 2: author — receives the research brief
         author_prompt = (
@@ -52,7 +56,7 @@ def main():
             f"{research_output}\n\n"
             "Write a compelling, well-structured article based on the research."
         )
-        article_output = run_agent_step(client, agents, envs, "cc-author", "cc-env", author_prompt)
+        article_output = run_agent_step(client, agents, envs, "cc-author", "cc-env", author_prompt, output_dir)
 
         # Step 3: editor — receives the full article draft
         editor_prompt = (
@@ -61,7 +65,7 @@ def main():
             f"{article_output}\n\n"
             "Edit and polish it: fix grammar, improve flow, and return the final version."
         )
-        run_agent_step(client, agents, envs, "cc-editor", "cc-env", editor_prompt)
+        run_agent_step(client, agents, envs, "cc-editor", "cc-env", editor_prompt, output_dir)
     except KeyError as e:
         raise SystemExit(f"Error: {e}") from e
 
