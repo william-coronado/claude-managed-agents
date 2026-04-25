@@ -45,22 +45,22 @@ class TestSERunAgentStep:
         mock_cs.assert_called_once_with(client, "a1", "e1", title="do the thing")
         mock_sm.assert_called_once_with(client, "sess-1", "do the thing")
 
-    def test_unknown_agent_raises_system_exit(self):
+    def test_unknown_agent_raises_key_error(self):
         run_agent_step = self._import()
         client = MagicMock()
         agents = {}
         envs = {"se-env": _make_mock_env()}
 
-        with pytest.raises(SystemExit, match="unknown-agent"):
+        with pytest.raises(KeyError, match="unknown-agent"):
             run_agent_step(client, agents, envs, "unknown-agent", "se-env", "prompt")
 
-    def test_unknown_env_raises_system_exit(self):
+    def test_unknown_env_raises_key_error(self):
         run_agent_step = self._import()
         client = MagicMock()
         agents = {"se-planner": _make_mock_agent()}
         envs = {}
 
-        with pytest.raises(SystemExit, match="unknown-env"):
+        with pytest.raises(KeyError, match="unknown-env"):
             run_agent_step(client, agents, envs, "se-planner", "unknown-env", "prompt")
 
 
@@ -88,20 +88,20 @@ class TestCCRunAgentStep:
         mock_cs.assert_called_once_with(client, "a2", "e2", title="research AI")
         mock_sm.assert_called_once_with(client, "sess-2", "research AI")
 
-    def test_unknown_agent_raises_system_exit(self):
+    def test_unknown_agent_raises_key_error(self):
         run_agent_step = self._import()
         client = MagicMock()
         agents = {}
         envs = {"cc-env": _make_mock_env()}
 
-        with pytest.raises(SystemExit, match="unknown-agent"):
+        with pytest.raises(KeyError, match="unknown-agent"):
             run_agent_step(client, agents, envs, "unknown-agent", "cc-env", "prompt")
 
-    def test_unknown_env_raises_system_exit(self):
+    def test_unknown_env_raises_key_error(self):
         run_agent_step = self._import()
         client = MagicMock()
         agents = {"cc-researcher": _make_mock_agent()}
         envs = {}
 
-        with pytest.raises(SystemExit, match="unknown-env"):
+        with pytest.raises(KeyError, match="unknown-env"):
             run_agent_step(client, agents, envs, "cc-researcher", "unknown-env", "prompt")

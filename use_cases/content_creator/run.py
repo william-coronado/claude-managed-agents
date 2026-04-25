@@ -36,31 +36,34 @@ def main():
 
     envs, agents = load_resources(client, cfg.default_model, ENV_CONFIG, AGENT_CONFIG, existing=args.existing)
 
-    # Step 1: researcher
-    research_prompt = (
-        f"Topic: {args.topic}\n\n"
-        "Research this topic thoroughly. Gather facts, statistics, key developments, "
-        "and notable sources. Produce a structured research brief."
-    )
-    research_output = run_agent_step(client, agents, envs, "cc-researcher", "cc-env", research_prompt)
+    try:
+        # Step 1: researcher
+        research_prompt = (
+            f"Topic: {args.topic}\n\n"
+            "Research this topic thoroughly. Gather facts, statistics, key developments, "
+            "and notable sources. Produce a structured research brief."
+        )
+        research_output = run_agent_step(client, agents, envs, "cc-researcher", "cc-env", research_prompt)
 
-    # Step 2: author — receives the research brief
-    author_prompt = (
-        f"Topic: {args.topic}\n\n"
-        "A researcher has compiled the following brief:\n\n"
-        f"{research_output}\n\n"
-        "Write a compelling, well-structured article based on the research."
-    )
-    article_output = run_agent_step(client, agents, envs, "cc-author", "cc-env", author_prompt)
+        # Step 2: author — receives the research brief
+        author_prompt = (
+            f"Topic: {args.topic}\n\n"
+            "A researcher has compiled the following brief:\n\n"
+            f"{research_output}\n\n"
+            "Write a compelling, well-structured article based on the research."
+        )
+        article_output = run_agent_step(client, agents, envs, "cc-author", "cc-env", author_prompt)
 
-    # Step 3: editor — receives the full article draft
-    editor_prompt = (
-        f"Topic: {args.topic}\n\n"
-        "The author has produced the following draft:\n\n"
-        f"{article_output}\n\n"
-        "Edit and polish it: fix grammar, improve flow, and return the final version."
-    )
-    run_agent_step(client, agents, envs, "cc-editor", "cc-env", editor_prompt)
+        # Step 3: editor — receives the full article draft
+        editor_prompt = (
+            f"Topic: {args.topic}\n\n"
+            "The author has produced the following draft:\n\n"
+            f"{article_output}\n\n"
+            "Edit and polish it: fix grammar, improve flow, and return the final version."
+        )
+        run_agent_step(client, agents, envs, "cc-editor", "cc-env", editor_prompt)
+    except KeyError as e:
+        raise SystemExit(f"Error: {e}") from e
 
 
 if __name__ == "__main__":

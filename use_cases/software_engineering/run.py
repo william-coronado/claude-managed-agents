@@ -36,38 +36,41 @@ def main():
 
     envs, agents = load_resources(client, cfg.default_model, ENV_CONFIG, AGENT_CONFIG, existing=args.existing)
 
-    # Step 1: planner
-    plan_prompt = f"Task: {args.task}\n\nProduce a detailed technical plan."
-    plan_output = run_agent_step(client, agents, envs, "se-planner", "se-env", plan_prompt)
+    try:
+        # Step 1: planner
+        plan_prompt = f"Task: {args.task}\n\nProduce a detailed technical plan."
+        plan_output = run_agent_step(client, agents, envs, "se-planner", "se-env", plan_prompt)
 
-    # Step 2: coder — receives the technical plan
-    code_prompt = (
-        f"Task: {args.task}\n\n"
-        "A planner has produced the following architecture:\n\n"
-        f"{plan_output}\n\n"
-        "Implement complete, working Python code following that plan."
-    )
-    code_output = run_agent_step(client, agents, envs, "se-coder", "se-env", code_prompt)
+        # Step 2: coder — receives the technical plan
+        code_prompt = (
+            f"Task: {args.task}\n\n"
+            "A planner has produced the following architecture:\n\n"
+            f"{plan_output}\n\n"
+            "Implement complete, working Python code following that plan."
+        )
+        code_output = run_agent_step(client, agents, envs, "se-coder", "se-env", code_prompt)
 
-    # Step 3: reviewer — receives the implementation
-    review_prompt = (
-        f"Task: {args.task}\n\n"
-        "The coder has produced the following implementation:\n\n"
-        f"{code_output}\n\n"
-        "Review it for correctness, security, performance, and style."
-    )
-    review_output = run_agent_step(client, agents, envs, "se-reviewer", "se-env", review_prompt)
+        # Step 3: reviewer — receives the implementation
+        review_prompt = (
+            f"Task: {args.task}\n\n"
+            "The coder has produced the following implementation:\n\n"
+            f"{code_output}\n\n"
+            "Review it for correctness, security, performance, and style."
+        )
+        review_output = run_agent_step(client, agents, envs, "se-reviewer", "se-env", review_prompt)
 
-    # Step 4: tester — receives the implementation and review
-    test_prompt = (
-        f"Task: {args.task}\n\n"
-        "The implementation:\n\n"
-        f"{code_output}\n\n"
-        "Review feedback:\n\n"
-        f"{review_output}\n\n"
-        "Write a comprehensive pytest test suite for it and run the tests."
-    )
-    run_agent_step(client, agents, envs, "se-tester", "se-env", test_prompt)
+        # Step 4: tester — receives the implementation and review
+        test_prompt = (
+            f"Task: {args.task}\n\n"
+            "The implementation:\n\n"
+            f"{code_output}\n\n"
+            "Review feedback:\n\n"
+            f"{review_output}\n\n"
+            "Write a comprehensive pytest test suite for it and run the tests."
+        )
+        run_agent_step(client, agents, envs, "se-tester", "se-env", test_prompt)
+    except KeyError as e:
+        raise SystemExit(f"Error: {e}") from e
 
 
 if __name__ == "__main__":
