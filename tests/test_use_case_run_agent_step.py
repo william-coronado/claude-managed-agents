@@ -23,50 +23,7 @@ def _make_mock_session(id_="sess-id"):
 
 
 # ---------------------------------------------------------------------------
-# software_engineering use case
-# ---------------------------------------------------------------------------
-
-class TestSERunAgentStep:
-    def _import(self):
-        from use_cases.software_engineering.run import run_agent_step
-        return run_agent_step
-
-    def test_happy_path_returns_stream_output(self):
-        run_agent_step = self._import()
-        client = MagicMock()
-        agents = {"se-planner": _make_mock_agent("a1")}
-        envs = {"se-env": _make_mock_env("e1")}
-        mock_session = _make_mock_session("sess-1")
-
-        with patch("src.pipeline.create_session", return_value=mock_session) as mock_cs, \
-             patch("src.pipeline.stream_message", return_value="step output") as mock_sm:
-            result = run_agent_step(client, agents, envs, "se-planner", "se-env", "do the thing")
-
-        assert result == "step output"
-        mock_cs.assert_called_once_with(client, "a1", "e1", title="do the thing")
-        mock_sm.assert_called_once_with(client, "sess-1", "do the thing", output_dir=None)
-
-    def test_unknown_agent_raises_key_error(self):
-        run_agent_step = self._import()
-        client = MagicMock()
-        agents = {}
-        envs = {"se-env": _make_mock_env()}
-
-        with pytest.raises(KeyError, match="unknown-agent"):
-            run_agent_step(client, agents, envs, "unknown-agent", "se-env", "prompt")
-
-    def test_unknown_env_raises_key_error(self):
-        run_agent_step = self._import()
-        client = MagicMock()
-        agents = {"se-planner": _make_mock_agent()}
-        envs = {}
-
-        with pytest.raises(KeyError, match="unknown-env"):
-            run_agent_step(client, agents, envs, "se-planner", "unknown-env", "prompt")
-
-
-# ---------------------------------------------------------------------------
-# content_creator use case
+# content_creator use case (the SE pipeline now uses a coordinator, not run_agent_step)
 # ---------------------------------------------------------------------------
 
 class TestCCRunAgentStep:
@@ -87,7 +44,7 @@ class TestCCRunAgentStep:
 
         assert result == "research output"
         mock_cs.assert_called_once_with(client, "a2", "e2", title="research AI")
-        mock_sm.assert_called_once_with(client, "sess-2", "research AI", output_dir=None)
+        mock_sm.assert_called_once_with(client, "sess-2", "research AI")
 
     def test_unknown_agent_raises_key_error(self):
         run_agent_step = self._import()
@@ -122,26 +79,30 @@ class TestRunAgentStepOutputCapture:
         envs = {"my-env": _make_mock_env("env-id")}
         return MagicMock(), agents, envs
 
-    def test_passes_agent_subdir_to_stream_message(self, tmp_path):
+    def test_downloads_outputs_to_agent_subdir(self, tmp_path):
         run_agent_step = self._import()
         client, agents, envs = self._setup()
         session = _make_mock_session("sess-dl")
 
         with patch("src.pipeline.create_session", return_value=session), \
-             patch("src.pipeline.stream_message", return_value="out") as mock_sm:
+             patch("src.pipeline.stream_message", return_value="out") as mock_sm, \
+             patch("src.pipeline.download_session_outputs") as mock_dl:
             result = run_agent_step(client, agents, envs, "my-agent", "my-env", "prompt", tmp_path)
 
         assert result == "out"
-        mock_sm.assert_called_once_with(client, "sess-dl", "prompt", output_dir=tmp_path / "my-agent")
+        mock_sm.assert_called_once_with(client, "sess-dl", "prompt")
+        mock_dl.assert_called_once_with(client, "sess-dl", tmp_path / "my-agent")
 
-    def test_passes_none_output_dir_when_not_set(self):
+    def test_no_download_when_output_dir_not_set(self):
         run_agent_step = self._import()
         client, agents, envs = self._setup()
         session = _make_mock_session("sess-nodl")
 
         with patch("src.pipeline.create_session", return_value=session), \
-             patch("src.pipeline.stream_message", return_value="out") as mock_sm:
+             patch("src.pipeline.stream_message", return_value="out") as mock_sm, \
+             patch("src.pipeline.download_session_outputs") as mock_dl:
             result = run_agent_step(client, agents, envs, "my-agent", "my-env", "prompt")
 
         assert result == "out"
-        mock_sm.assert_called_once_with(client, "sess-nodl", "prompt", output_dir=None)
+        mock_sm.assert_called_once_with(client, "sess-nodl", "prompt")
+        mock_dl.assert_not_called()

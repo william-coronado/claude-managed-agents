@@ -8,6 +8,8 @@ from src.agent import Agent
 from src.environment import Environment
 from src.session import create_session
 from src.messaging import stream_message
+from src.outputs import download_session_outputs
+from src.retry import with_retries
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +23,12 @@ def run_agent_step(
     prompt: str,
     output_dir: Optional[Path] = None,
 ) -> str:
+    """Run one agent as its own session and return its text output.
+
+    When ``output_dir`` is set, files the agent wrote to /mnt/session/outputs/
+    are downloaded (via the Files API) into ``output_dir/<agent_name>`` after
+    the turn completes.
+    """
     logger.info("\n%s\n[%s]\n%s", "=" * 60, agent_name.upper(), "=" * 60)
     if agent_name not in agents:
         raise KeyError(f"agent '{agent_name}' not found in loaded agents")
@@ -28,6 +36,11 @@ def run_agent_step(
         raise KeyError(f"environment '{env_name}' not found in loaded environments")
     agent = agents[agent_name]
     env = envs[env_name]
-    session = create_session(client, agent.id, env.id, title=prompt[:80])
-    agent_output_dir = output_dir / agent_name if output_dir is not None else None
-    return stream_message(client, session.id, prompt, output_dir=agent_output_dir)
+    session = with_retries(
+        lambda: create_session(client, agent.id, env.id, title=prompt[:80]),
+        description="session create",
+    )
+    output = stream_message(client, session.id, prompt)
+    if output_dir is not None:
+        download_session_outputs(client, session.id, output_dir / agent_name)
+    return output

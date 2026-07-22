@@ -27,6 +27,7 @@ class AgentConfig:
     tools: list = field(default_factory=list)
     mcp_servers: list = field(default_factory=list)
     skills: list = field(default_factory=list)
+    multiagent: Optional[dict] = None
 
 
 def load_global_config(path: str) -> GlobalConfig:
@@ -105,5 +106,6 @@ def load_agents_config(path: str) -> list[AgentConfig]:
             tools=item.get("tools", []),
             mcp_servers=item.get("mcp_servers", []),
             skills=item.get("skills", []),
+            multiagent=item.get("multiagent"),
         ))
     return result

@@ -63,10 +63,15 @@ def main():
             f"Topic: {args.topic}\n\n"
             "The author has produced the following draft:\n\n"
             f"{article_output}\n\n"
-            "Edit and polish it: fix grammar, improve flow, and return the final version."
+            "Edit and polish it: fix grammar, improve flow, and produce the final version "
+            "(article.md and article.docx) in the outputs directory."
         )
-        run_agent_step(client, agents, envs, "cc-editor", "cc-env", editor_prompt, output_dir)
-    except KeyError as e:
+        final_output = run_agent_step(client, agents, envs, "cc-editor", "cc-env", editor_prompt, output_dir)
+        if output_dir:
+            print(f"\n=== Final article saved under {output_dir / 'cc-editor'} ===")
+        else:
+            print("\n=== Final article ===\n" + final_output)
+    except (KeyError, RuntimeError) as e:
         raise SystemExit(f"Error: {e}") from e
 
 

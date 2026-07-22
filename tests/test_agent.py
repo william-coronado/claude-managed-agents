@@ -61,6 +61,25 @@ class TestCreateAgentNew:
 
         assert client.beta.agents.create.call_args.kwargs["model"] == "fallback-model"
 
+    def test_no_multiagent_kwarg_when_not_configured(self):
+        client = MagicMock()
+        client.beta.agents.create.return_value = _make_api_agent("agent")
+
+        create_agent(client, _make_config(), default_model="m")
+
+        assert "multiagent" not in client.beta.agents.create.call_args.kwargs
+
+    def test_multiagent_roster_passed_through(self):
+        client = MagicMock()
+        client.beta.agents.create.return_value = _make_api_agent("lead")
+        roster = {"type": "coordinator", "agents": ["agent_a", "agent_b"]}
+        config = AgentConfig(name="lead", system="coordinate", multiagent=roster)
+
+        agent = create_agent(client, config, default_model="m")
+
+        assert client.beta.agents.create.call_args.kwargs["multiagent"] == roster
+        assert agent.version == 1  # exposed from the API object
+
 
 # ---------------------------------------------------------------------------
 # create_agent — existing resource (pagination)
