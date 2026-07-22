@@ -1,7 +1,6 @@
 """Unit tests for src/messaging.py"""
 import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock
 
 
 # ---------------------------------------------------------------------------
@@ -22,10 +21,10 @@ def _make_block(text):
     return b
 
 
-def _make_write_event(file_path: str, content: str):
-    ev = _make_event("agent.tool_use", name="write")
-    ev.input = {"file_path": file_path, "content": content}
-    return ev
+def _stop(type_):
+    sr = MagicMock()
+    sr.type = type_
+    return sr
 
 
 def _make_stream(events):
@@ -50,7 +49,7 @@ class TestStreamMessage:
         client.beta.sessions.events.stream.return_value = _make_stream(events)
         return client
 
-    def test_returns_agent_message_text(self, capsys):
+    def test_returns_agent_message_text(self):
         from src.messaging import stream_message
 
         events = [
@@ -74,8 +73,7 @@ class TestStreamMessage:
         ]
         client = self._make_client(events)
         stream_message(client, "sess-1", "hi")
-        captured = capsys.readouterr()
-        assert "Printed text" in captured.out
+        assert "Printed text" in capsys.readouterr().out
 
     def test_tool_use_event_printed(self, capsys):
         from src.messaging import stream_message
@@ -86,28 +84,23 @@ class TestStreamMessage:
         ]
         client = self._make_client(events)
         stream_message(client, "sess-1", "run tool")
-        captured = capsys.readouterr()
-        assert "[Tool: bash]" in captured.out
+        assert "[Tool: bash]" in capsys.readouterr().out
 
     def test_session_error_raises_runtime_error(self, capsys):
         from src.messaging import stream_message
 
-        events = [
-            _make_event("session.error", message="something went wrong"),
-        ]
+        events = [_make_event("session.error", message="something went wrong")]
         client = self._make_client(events)
         with pytest.raises(RuntimeError, match="Session error: something went wrong"):
             stream_message(client, "sess-1", "hi")
-        captured = capsys.readouterr()
-        assert "[Error: something went wrong]" in captured.out
+        assert "[Error: something went wrong]" in capsys.readouterr().out
 
     def test_returns_empty_string_when_no_message_blocks(self):
         from src.messaging import stream_message
 
         events = [_make_event("session.status_idle")]
         client = self._make_client(events)
-        result = stream_message(client, "sess-1", "hi")
-        assert result == ""
+        assert stream_message(client, "sess-1", "hi") == ""
 
     def test_accumulates_multiple_messages(self):
         from src.messaging import stream_message
@@ -118,101 +111,80 @@ class TestStreamMessage:
             _make_event("session.status_idle"),
         ]
         client = self._make_client(events)
-        result = stream_message(client, "sess-1", "hi")
-        assert result == "Part1Part2"
+        assert stream_message(client, "sess-1", "hi") == "Part1Part2"
 
     def test_non_text_blocks_in_agent_message_are_skipped(self):
         from src.messaging import stream_message
 
-        # A block without a .text attribute (e.g. a tool-result block) should
-        # not cause an AttributeError; only text blocks contribute to output.
-        non_text_block = MagicMock(spec=[])  # spec=[] → no attributes at all
+        non_text_block = MagicMock(spec=[])  # no attributes at all
         events = [
             _make_event("agent.message", content=[_make_block("Hello"), non_text_block]),
             _make_event("session.status_idle"),
         ]
         client = self._make_client(events)
+        assert stream_message(client, "sess-1", "hi") == "Hello"
+
+    # ------------------------------------------------------------------
+    # Corrected stream gate (idle / terminated / requires_action)
+    # ------------------------------------------------------------------
+
+    def test_terminated_event_breaks_stream(self, capsys):
+        from src.messaging import stream_message
+
+        events = [
+            _make_event("agent.message", content=[_make_block("bye")]),
+            _make_event("session.status_terminated"),
+            _make_event("agent.message", content=[_make_block("SHOULD NOT APPEAR")]),
+        ]
+        client = self._make_client(events)
         result = stream_message(client, "sess-1", "hi")
-        assert result == "Hello"
+        assert result == "bye"
+        assert "[Terminated]" in capsys.readouterr().out
 
-    # ------------------------------------------------------------------
-    # write-tool file capture
-    # ------------------------------------------------------------------
-
-    def test_write_event_saves_file_when_output_dir_set(self, tmp_path):
+    def test_terminal_idle_breaks(self):
         from src.messaging import stream_message
 
         events = [
-            _make_write_event("/mnt/session/outputs/result.py", "print('hi')"),
+            _make_event("agent.message", content=[_make_block("done")]),
+            _make_event("session.status_idle", stop_reason=_stop("end_turn")),
+            _make_event("agent.message", content=[_make_block("AFTER")]),
+        ]
+        client = self._make_client(events)
+        assert stream_message(client, "sess-1", "hi") == "done"
+
+    def test_requires_action_idle_does_not_break(self):
+        from src.messaging import stream_message
+
+        # A transient idle (waiting on the client) must not end the turn;
+        # streaming continues until a terminal idle.
+        events = [
+            _make_event("agent.message", content=[_make_block("A")]),
+            _make_event("session.status_idle", stop_reason=_stop("requires_action")),
+            _make_event("agent.message", content=[_make_block("B")]),
+            _make_event("session.status_idle", stop_reason=_stop("end_turn")),
+        ]
+        client = self._make_client(events)
+        assert stream_message(client, "sess-1", "hi") == "AB"
+
+    def test_on_event_callback_invoked_for_every_event(self):
+        from src.messaging import stream_message
+
+        seen = []
+        events = [
+            _make_event("agent.tool_use", name="bash"),
             _make_event("session.status_idle"),
         ]
         client = self._make_client(events)
-        stream_message(client, "sess-1", "go", output_dir=tmp_path)
+        stream_message(client, "sess-1", "hi", on_event=lambda e: seen.append(e.type))
+        assert seen == ["agent.tool_use", "session.status_idle"]
 
-        assert (tmp_path / "result.py").read_text() == "print('hi')"
-
-    def test_write_event_preserves_subdirectory_structure(self, tmp_path):
+    def test_outcome_grade_printed(self, capsys):
         from src.messaging import stream_message
 
         events = [
-            _make_write_event("/mnt/session/outputs/todo/main.py", "# main"),
-            _make_write_event("/mnt/session/outputs/todo/utils/helpers.py", "# helpers"),
+            _make_event("span.outcome_evaluation_end", result="satisfied"),
             _make_event("session.status_idle"),
         ]
         client = self._make_client(events)
-        stream_message(client, "sess-1", "go", output_dir=tmp_path)
-
-        assert (tmp_path / "todo" / "main.py").read_text() == "# main"
-        assert (tmp_path / "todo" / "utils" / "helpers.py").read_text() == "# helpers"
-
-    def test_write_event_skips_files_outside_remote_dir(self, tmp_path):
-        from src.messaging import stream_message
-
-        events = [
-            _make_write_event("/mnt/session/uploads/secret.txt", "secret"),
-            _make_write_event("/mnt/session/outputs/ok.txt", "ok"),
-            _make_event("session.status_idle"),
-        ]
-        client = self._make_client(events)
-        stream_message(client, "sess-1", "go", output_dir=tmp_path)
-
-        assert not (tmp_path / "secret.txt").exists()
-        assert (tmp_path / "ok.txt").read_text() == "ok"
-
-    def test_write_event_custom_remote_dir(self, tmp_path):
-        from src.messaging import stream_message
-
-        events = [
-            _make_write_event("/mnt/session/outputs/todo/main.py", "# main"),
-            _make_write_event("/mnt/session/outputs/notes/readme.md", "# notes"),
-            _make_event("session.status_idle"),
-        ]
-        client = self._make_client(events)
-        stream_message(client, "sess-1", "go", output_dir=tmp_path,
-                       remote_dir="/mnt/session/outputs/todo")
-
-        assert (tmp_path / "main.py").read_text() == "# main"
-        assert not (tmp_path / "readme.md").exists()
-
-    def test_write_event_not_saved_when_no_output_dir(self, tmp_path):
-        from src.messaging import stream_message
-
-        events = [
-            _make_write_event("/mnt/session/outputs/result.py", "print('hi')"),
-            _make_event("session.status_idle"),
-        ]
-        client = self._make_client(events)
-        stream_message(client, "sess-1", "go")  # no output_dir
-
-        assert not (tmp_path / "result.py").exists()
-
-    def test_non_write_tool_not_saved(self, tmp_path):
-        from src.messaging import stream_message
-
-        bash_event = _make_event("agent.tool_use", name="bash")
-        bash_event.input = {"command": "echo hello > /mnt/session/outputs/out.txt"}
-        events = [bash_event, _make_event("session.status_idle")]
-        client = self._make_client(events)
-        stream_message(client, "sess-1", "go", output_dir=tmp_path)
-
-        assert not list(tmp_path.iterdir())
+        stream_message(client, "sess-1", "hi")
+        assert "[Outcome grade: satisfied]" in capsys.readouterr().out

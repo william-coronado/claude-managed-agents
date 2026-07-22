@@ -29,17 +29,18 @@ export ANTHROPIC_API_KEY=your_key
 # Single-agent orchestrator
 python orchestrate.py --config config/global.yaml --prompt "Your message" --agent default-assistant --env default-env
 
-# Software engineering pipeline (planner → coder → reviewer → tester)
-python use_cases/software_engineering/run.py --task "Build a todo app"
+# Software engineering team (planner + coder + reviewer + tester as one coordinator
+# session, driven by a graded outcome — iterate until tests pass)
+python use_cases/software_engineering/run.py --task "Build a todo app" --output-dir ./outputs
 
-# Content creator pipeline (researcher → author → editor)
-python use_cases/content_creator/run.py --topic "AI agents in 2026"
+# Content creator pipeline (researcher → author → editor; editor emits article.docx)
+python use_cases/content_creator/run.py --topic "AI agents in 2026" --output-dir ./outputs
+
+# AI delivery team (solo consultant delivering like a whole team; optional GitHub PR)
+python use_cases/ai_delivery_team/run.py --brief "Build a CSV-to-report CLI" --output-dir ./deliverables
 
 # Pass --existing to reuse already-created cloud resources instead of creating new ones
 python use_cases/software_engineering/run.py --task "..." --existing
-
-# Download session output files to a local directory after each pipeline step
-python use_cases/software_engineering/run.py --task "..." --output-dir ./outputs
 
 # Download outputs from a specific session manually
 python download_outputs.py --session-id <session-id> --output-dir ./outputs
@@ -58,10 +59,14 @@ This is a Python scaffolding framework for orchestrating **Claude Managed Agents
 | `environment.py` | Thin wrapper around `client.beta.environments` API; supports create-new or find-existing-by-name |
 | `agent.py` | Thin wrapper around `client.beta.agents` API; supports create-new or find-existing-by-name; logs a warning when `--existing` reuses an agent whose stored model differs from the current config |
 | `loader.py` | `load_resources()` helper used by all entry points — iterates over all environments and agents, collects every `ResourceNotFoundError`, and raises a single `SystemExit` listing all missing resources |
-| `session.py` | Creates a session via `client.beta.sessions` API; sanitizes titles by stripping non-printable Unicode |
-| `messaging.py` | Opens an SSE stream (`client.beta.sessions.events.stream`), sends a user message, prints output, returns accumulated text; intercepts `agent.tool_use` events with `name="write"` and saves their content to `output_dir` when provided; logs skipped non-text blocks at DEBUG level |
-| `pipeline.py` | Shared `run_agent_step()` function used by all use-case pipeline runners — creates a session and calls `stream_message()` with `output_dir=<output_dir>/<agent_name>` so file capture happens in real time during streaming |
-| `downloads.py` | `download_session_outputs()` — replays session events via `client.beta.sessions.events.list()`, finds `agent.tool_use` events with `name="write"` targeting `remote_dir`, and writes their content locally; used by `download_outputs.py` for post-session retrieval |
+| `session.py` | Creates a session via `client.beta.sessions` API; sanitizes titles by stripping non-printable Unicode; supports `resources` (files / GitHub repos / memory stores), `vault_ids`, and agent version pinning |
+| `messaging.py` | `stream_session()` opens an SSE stream (`client.beta.sessions.events.stream`), runs a caller-supplied kickoff, and consumes to a terminal state; `stream_message()` is the user-message kickoff. Correct gate: breaks on `session.status_terminated` or a terminal `session.status_idle`, continues through a transient idle (`requires_action`). Surfaces tool use, multiagent thread activity, and outcome grades |
+| `outputs.py` | `download_session_outputs()` — lists session-scoped output files via the Files API (`client.beta.files.list(scope_id=..., betas=["managed-agents-2026-04-01"])`) and downloads each with `files.download()`, preserving subdirectories, guarding against path traversal, and retrying briefly to cover indexing lag. Supports binary artifacts (`.docx`/`.pptx`/`.xlsx`/`.pdf`/images) |
+| `outcomes.py` | `define_outcome()` sends a `user.define_outcome` event (goal + rubric); `OutcomeTracker` collects `span.outcome_evaluation_end` grades from the stream |
+| `team.py` | `create_coordinator()` builds a multiagent coordinator whose roster is a set of role agents; `run_outcome_session()` runs one shared-filesystem coordinator session driven by a graded outcome and downloads the deliverables |
+| `retry.py` | `with_retries()` — exponential backoff (2/4/8/16s) around transient API failures; wraps session creation |
+| `pipeline.py` | `run_agent_step()` (used by the content pipeline) — creates a session, streams, and downloads that session's outputs to `<output_dir>/<agent_name>` via the Files API |
+| `downloads.py` | Backward-compat re-export of `download_session_outputs` from `outputs.py` (the module used to replay events to reconstruct files; that workaround is gone) |
 
 ### Configuration hierarchy
 
@@ -70,27 +75,23 @@ This is a Python scaffolding framework for orchestrating **Claude Managed Agents
 
 Each use case has its own `config/` subdirectory that overrides the defaults.
 
-### Multi-agent pipelines (`use_cases/`)
+### Use cases (`use_cases/`)
 
-Both `software_engineering/run.py` and `content_creator/run.py` follow the same pattern:
-1. Load config and construct an `Anthropic` client
-2. Call `load_resources()` to create (or look up) all environments and agents; any missing resources are reported together before exiting
-3. Run agents sequentially, passing the output of each step as input to the next via `run_agent_step()`
-4. If `--output-dir` is provided, `run_agent_step()` passes `output_dir/<agent_name>` to `stream_message()`, which captures files in real time as the agent writes them during streaming
+Two orchestration shapes are used:
 
-`run_agent_step()` lives in `src/pipeline.py` and is imported by both runners. It creates a session and calls `stream_message()` with the namespaced output directory.
+- **Sequential pipeline** (`content_creator/run.py`): loads resources via `load_resources()`, runs agents in order with `run_agent_step()` (each its own session), feeding each step's text output into the next. `--output-dir` downloads each session's outputs to `<output_dir>/<agent_name>`.
+- **Multiagent coordinator + outcome** (`software_engineering/run.py`, `ai_delivery_team/run.py`): creates the role agents, then builds a coordinator (`create_coordinator()`) whose `multiagent` roster is those agents. `run_outcome_session()` opens **one** session (all roles share the container and filesystem), sends a `user.define_outcome` with an acceptance rubric, streams until the grader is satisfied (or hits `max_iterations`), and downloads the deliverables. This lets QA run the engineer's *actual* files and loops reviewer/QA feedback back to the engineer automatically.
 
-**How file capture works:** The managed agents platform does not expose files agents create at runtime through any post-session API (`sessions.resources.list` only returns explicitly mounted inputs). Instead, file content is captured from `agent.tool_use` SSE events during streaming — the agent's built-in `write` tool emits an event containing both `file_path` and `content`. `stream_message()` intercepts these events and writes the content locally. `download_outputs.py` achieves the same result post-session by replaying events via `sessions.events.list()`.
+**How output capture works:** The platform captures anything the agent writes under `/mnt/session/outputs/` and serves it through the Files API. `download_session_outputs()` (`src/outputs.py`) lists session-scoped files (`client.beta.files.list(scope_id=session_id, betas=["managed-agents-2026-04-01"])`) and downloads each one. This supersedes the earlier approach of reconstructing files from `write` tool events (which only handled text and re-derived content from the stream) and supports binary deliverables.
 
 ### Anthropic SDK beta APIs used
 
 - `client.beta.environments.create / list`
-- `client.beta.agents.create / list`
-- `client.beta.sessions.create`
-- `client.beta.sessions.events.stream` (SSE) — also source of `agent.tool_use` write events used for real-time file capture
-- `client.beta.sessions.events.send`
-- `client.beta.sessions.events.list` (to replay past events for post-session file retrieval in `download_outputs.py`)
+- `client.beta.agents.create / list` (incl. the `multiagent` coordinator roster)
+- `client.beta.sessions.create` (incl. `resources` and `vault_ids`)
+- `client.beta.sessions.events.stream / send` (SSE); `send` also delivers `user.define_outcome`
+- `client.beta.files.list(scope_id=...) / download` — session outputs (Files API)
 
 ### Test approach
 
-All 77 tests are unit tests that mock the Anthropic client; there are no integration tests hitting the real API. Tests live in `tests/` and mirror the `src/` module structure, including `tests/test_loader.py` which verifies the bulk-error-collection contract in `load_resources()`, `tests/test_messaging.py` which covers real-time file capture from `write` tool events, `tests/test_downloads.py` which covers `download_session_outputs()` (event-replay approach) and the `download_outputs.py` CLI, and `TestRunAgentStepOutputCapture` in `tests/test_use_case_run_agent_step.py` which verifies the subdirectory namespacing passed to `stream_message()`. Tests for `run_agent_step()` patch `src.pipeline.create_session` and `src.pipeline.stream_message`.
+All tests are unit tests that mock the Anthropic client; there are no integration tests hitting the real API. Tests live in `tests/` and mirror the `src/` module structure, including `tests/test_loader.py` (bulk-error-collection in `load_resources()`), `tests/test_messaging.py` (the corrected idle/terminated/requires_action stream gate), `tests/test_outputs.py` (Files API session-output download, traversal guard, indexing-lag retry, binary content), `tests/test_outcomes.py` and `tests/test_team.py` (outcome kickoff + coordinator session), `tests/test_retry.py` (transient-error backoff), and `tests/test_downloads.py` (the re-export and CLI).

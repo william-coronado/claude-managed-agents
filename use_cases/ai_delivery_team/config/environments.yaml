@@ -1,0 +1,14 @@
+environments:
+  - name: "adt-env"
+    description: "Delivery-team environment: dev tools + web + reachable MCP/GitHub hosts"
+    config:
+      # Unrestricted egress so the engineer can reach the GitHub MCP host and the
+      # team can research. Switch to a `limited` policy with allow_mcp_servers +
+      # allowed_hosts if you need tighter egress control.
+      networking:
+        type: "unrestricted"
+      packages:
+        pip:
+          - pytest
+          - black
+          - ruff
