@@ -68,6 +68,24 @@ class TestDownloadSessionOutputs:
 
         assert (tmp_path / "chart.png").read_bytes() == b"\x89PNG\r\n"
 
+    def test_follows_pagination_across_pages(self, tmp_path):
+        # A real SDK page exposes iter_pages(); .data is only the current page.
+        page1 = SimpleNamespace(data=[_file("f1", "a.txt")])
+        page2 = SimpleNamespace(data=[_file("f2", "b.txt")])
+        paged = SimpleNamespace(
+            data=[_file("f1", "a.txt")],  # first page only — must NOT be used alone
+            iter_pages=lambda: iter([page1, page2]),
+        )
+        client = MagicMock()
+        client.beta.files.list.return_value = paged
+        client.beta.files.download.side_effect = lambda fid: _make_download(fid)
+
+        count = download_session_outputs(client, "sess-page", tmp_path)
+
+        assert count == 2
+        assert (tmp_path / "a.txt").read_text() == "f1"
+        assert (tmp_path / "b.txt").read_text() == "f2"
+
     def test_accepts_plain_iterable_list_result(self, tmp_path):
         # files.list may return a directly-iterable page with no `.data`.
         client = MagicMock()

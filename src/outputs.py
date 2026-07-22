@@ -21,11 +21,20 @@ logger = logging.getLogger(__name__)
 
 
 def _iter_files(list_result):
-    """Return the file objects from a files.list() result.
+    """Return *all* file objects from a files.list() result, across pages.
 
-    The SDK returns a page object exposing ``.data``; older/newer shapes may be
-    directly iterable. Support both so we don't depend on one SDK minor.
+    The SDK returns a paginated page whose ``.data`` is only the current page;
+    ``.iter_pages()`` walks the rest. Use it (the same pattern as agent.py /
+    environment.py) so a session that writes more than one page of outputs
+    doesn't silently drop the remaining deliverables. Falls back to ``.data``
+    or direct iteration for simpler/mocked shapes.
     """
+    iter_pages = getattr(list_result, "iter_pages", None)
+    if callable(iter_pages):
+        files: list = []
+        for page in iter_pages():
+            files.extend(getattr(page, "data", None) or [])
+        return files
     data = getattr(list_result, "data", None)
     if data is not None:
         return list(data)
