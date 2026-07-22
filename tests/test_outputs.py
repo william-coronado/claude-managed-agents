@@ -23,7 +23,7 @@ def _make_download(content):
         if isinstance(content, bytes):
             p.write_bytes(content)
         else:
-            p.write_text(content)
+            p.write_text(content, encoding="utf-8")
 
     dl.write_to_file.side_effect = _write
     return dl
@@ -48,8 +48,8 @@ class TestDownloadSessionOutputs:
         client.beta.files.list.assert_called_once_with(
             scope_id="sess-1", betas=[MANAGED_AGENTS_BETA]
         )
-        assert (tmp_path / "result.py").read_text() == "print('ok')"
-        assert (tmp_path / "report.md").read_text() == "# Report"
+        assert (tmp_path / "result.py").read_text(encoding="utf-8") == "print('ok')"
+        assert (tmp_path / "report.md").read_text(encoding="utf-8") == "# Report"
 
     def test_preserves_subdirectory_structure(self, tmp_path):
         files = [_file("f1", "todo/main.py"), _file("f2", "todo/utils/helpers.py")]
@@ -57,8 +57,8 @@ class TestDownloadSessionOutputs:
 
         download_session_outputs(client, "sess-2", tmp_path)
 
-        assert (tmp_path / "todo" / "main.py").read_text() == "# main"
-        assert (tmp_path / "todo" / "utils" / "helpers.py").read_text() == "# helpers"
+        assert (tmp_path / "todo" / "main.py").read_text(encoding="utf-8") == "# main"
+        assert (tmp_path / "todo" / "utils" / "helpers.py").read_text(encoding="utf-8") == "# helpers"
 
     def test_handles_binary_content(self, tmp_path):
         files = [_file("f1", "chart.png")]
@@ -83,8 +83,8 @@ class TestDownloadSessionOutputs:
         count = download_session_outputs(client, "sess-page", tmp_path)
 
         assert count == 2
-        assert (tmp_path / "a.txt").read_text() == "f1"
-        assert (tmp_path / "b.txt").read_text() == "f2"
+        assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "f1"
+        assert (tmp_path / "b.txt").read_text(encoding="utf-8") == "f2"
 
     def test_accepts_plain_iterable_list_result(self, tmp_path):
         # files.list may return a directly-iterable page with no `.data`.
@@ -95,7 +95,7 @@ class TestDownloadSessionOutputs:
         count = download_session_outputs(client, "sess-iter", tmp_path)
 
         assert count == 1
-        assert (tmp_path / "plain.txt").read_text() == "iter"
+        assert (tmp_path / "plain.txt").read_text(encoding="utf-8") == "iter"
 
     @pytest.mark.parametrize(
         "bad_name",
@@ -109,7 +109,7 @@ class TestDownloadSessionOutputs:
         count = download_session_outputs(client, "sess-4", tmp_path)
 
         assert count == 1
-        assert (tmp_path / "ok.txt").read_text() == "good"
+        assert (tmp_path / "ok.txt").read_text(encoding="utf-8") == "good"
         # Nothing escaped into the parent directory.
         assert {p.name for p in tmp_path.parent.iterdir()} == before
 
@@ -138,7 +138,7 @@ class TestDownloadSessionOutputs:
             count = download_session_outputs(client, "sess-7", tmp_path, retries=1, retry_delay=0.01)
 
         assert count == 1
-        assert (tmp_path / "late.txt").read_text() == "here"
+        assert (tmp_path / "late.txt").read_text(encoding="utf-8") == "here"
         mock_sleep.assert_called_once()
 
     def test_falls_back_to_id_when_filename_missing(self, tmp_path):
@@ -150,4 +150,4 @@ class TestDownloadSessionOutputs:
         count = download_session_outputs(client, "sess-8", tmp_path)
 
         assert count == 1
-        assert (tmp_path / "f1").read_text() == "data"
+        assert (tmp_path / "f1").read_text(encoding="utf-8") == "data"
