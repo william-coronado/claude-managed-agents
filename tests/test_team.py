@@ -89,3 +89,46 @@ class TestRunOutcomeSession:
             run_outcome_session(client, _member("c"), _member("e"), "Build X", "- crit")
 
         mock_dl.assert_not_called()
+
+    def test_resources_and_vaults_forwarded_to_create_session(self):
+        client = MagicMock()
+        session = MagicMock()
+        session.id = "sess-r"
+        resources = [{"type": "github_repository", "url": "https://github.com/a/b"}]
+        vaults = ["vlt_1", "vlt_2"]
+
+        with patch("src.team.create_session", return_value=session) as mock_cs, \
+             patch("src.team.define_outcome"), \
+             patch("src.team.stream_session"), \
+             patch("src.team.download_session_outputs"):
+            run_outcome_session(
+                client, _member("c"), _member("e"), "Build X", "- crit",
+                resources=resources, vault_ids=vaults,
+            )
+
+        kwargs = mock_cs.call_args.kwargs
+        assert kwargs["resources"] == resources
+        assert kwargs["vault_ids"] == vaults
+
+    def test_max_iterations_forwarded_to_define_outcome(self):
+        client = MagicMock()
+        session = MagicMock()
+        session.id = "sess-m"
+
+        # stream_session runs the caller-supplied kickoff (which sends the outcome).
+        def _run_kickoff(client, session_id, kickoff=None, on_event=None):
+            kickoff()
+            return ""
+
+        with patch("src.team.create_session", return_value=session), \
+             patch("src.team.define_outcome") as mock_define, \
+             patch("src.team.stream_session", side_effect=_run_kickoff), \
+             patch("src.team.download_session_outputs"):
+            run_outcome_session(
+                client, _member("c"), _member("e"), "Build X", "- crit",
+                max_iterations=9,
+            )
+
+        # define_outcome(client, session_id, description, rubric, max_iterations)
+        mock_define.assert_called_once()
+        assert mock_define.call_args.args[4] == 9

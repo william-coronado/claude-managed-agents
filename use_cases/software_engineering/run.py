@@ -97,6 +97,8 @@ def main():
         raise SystemExit(f"Error: session failed: {e}") from e
 
     print(f"\n=== Outcome result: {tracker.last_result} ===")
+    if not tracker.satisfied:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

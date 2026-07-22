@@ -1,4 +1,5 @@
 """Unit tests for src/retry.py"""
+import anthropic
 import pytest
 from unittest.mock import patch
 
@@ -9,6 +10,13 @@ class _HTTPish(Exception):
     def __init__(self, status_code, msg="boom"):
         super().__init__(msg)
         self.status_code = status_code
+
+
+class _FakeConnError(anthropic.APIConnectionError):
+    """A stand-in connection error whose heavyweight parent init we skip."""
+
+    def __init__(self):  # noqa: D107 - bypass parent constructor (needs a request)
+        Exception.__init__(self, "connection reset")
 
 
 class TestWithRetries:
@@ -49,15 +57,26 @@ class TestWithRetries:
             with pytest.raises(_HTTPish):
                 with_retries(always_overloaded, attempts=3)
 
-    def test_transient_by_message_when_no_status(self):
+    def test_connection_error_is_transient(self):
         calls = {"n": 0}
 
         def flaky():
             calls["n"] += 1
             if calls["n"] == 1:
-                raise ConnectionError("connection reset")
+                raise _FakeConnError()
             return "recovered"
 
         with patch("src.retry.time.sleep"):
             assert with_retries(flaky) == "recovered"
         assert calls["n"] == 2
+
+    def test_programming_error_not_retried(self):
+        calls = {"n": 0}
+
+        def bad():
+            calls["n"] += 1
+            raise ValueError("bug, not a network blip")
+
+        with pytest.raises(ValueError):
+            with_retries(bad)
+        assert calls["n"] == 1  # no status_code, not a connection error → not retried

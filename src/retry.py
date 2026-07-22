@@ -11,21 +11,33 @@ import logging
 import time
 from typing import Callable, TypeVar
 
+import anthropic
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
-# Retry only on errors that are plausibly transient. Import lazily so the module
-# is usable (and testable) without the anthropic package installed.
-_TRANSIENT_MESSAGE_HINTS = ("overloaded", "timeout", "timed out", "connection", "temporarily")
+# Connection/timeout failures carry no HTTP status but are transient.
+# (APITimeoutError is a subclass of APIConnectionError.)
+_CONNECTION_ERRORS = (anthropic.APIConnectionError,)
+# HTTP statuses worth retrying (matches the SDK's own retry policy).
+_RETRYABLE_STATUS = frozenset({408, 409, 429})
 
 
 def _is_transient(exc: Exception) -> bool:
+    """True only for network/overload failures — never for programming errors.
+
+    Retries connection/timeout errors, and any exception exposing an integer
+    ``status_code`` of 408/409/429 or >= 500 (covers RateLimitError,
+    InternalServerError, and APIStatusError). Anything else — a ValueError,
+    KeyError, a 4xx client error — is not transient.
+    """
+    if isinstance(exc, _CONNECTION_ERRORS):
+        return True
     status = getattr(exc, "status_code", None)
-    if status is not None:
-        return status == 408 or status == 409 or status == 429 or status >= 500
-    msg = str(exc).lower()
-    return any(hint in msg for hint in _TRANSIENT_MESSAGE_HINTS)
+    if isinstance(status, int):
+        return status in _RETRYABLE_STATUS or status >= 500
+    return False
 
 
 def with_retries(
@@ -40,19 +52,17 @@ def with_retries(
     Delays follow base_delay * 2**n (2/4/8/16s by default). Non-transient
     errors are re-raised immediately.
     """
-    last_exc: Exception | None = None
     for attempt in range(attempts):
         try:
             return func()
         except Exception as exc:  # noqa: BLE001 - re-raised below when not transient
             if not _is_transient(exc) or attempt == attempts - 1:
                 raise
-            last_exc = exc
             delay = base_delay * (2 ** attempt)
             logger.warning(
                 "%s failed (attempt %d/%d): %s; retrying in %.0fs",
                 description, attempt + 1, attempts, exc, delay,
             )
             time.sleep(delay)
-    # Unreachable (loop either returns or raises), but keep type-checkers happy.
-    raise last_exc  # type: ignore[misc]
+    # Unreachable: the loop either returns or raises.
+    raise AssertionError("with_retries exhausted its loop without returning or raising")

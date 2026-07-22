@@ -73,3 +73,8 @@ class OutcomeTracker:
     @property
     def satisfied(self) -> bool:
         return self.last_result == "satisfied"
+
+    @property
+    def terminal(self) -> bool:
+        """True once the grader has reached a terminal result (any of TERMINAL_RESULTS)."""
+        return self.last_result in TERMINAL_RESULTS

@@ -63,11 +63,21 @@ DEFAULT_RUBRIC = """\
 - If a repository was provided, a pull request was opened with the change."""
 
 
-def _resolve_text(value: str) -> str:
-    """Return literal text, or the contents of a file when value is '@path'."""
-    if value.startswith("@"):
-        return Path(value[1:]).read_text(encoding="utf-8")
-    return value
+def _resolve_text(value: str, context: str) -> str:
+    """Return literal text, or the contents of a file when value is '@path'.
+
+    ``context`` labels the input (e.g. "brief") for clear CLI errors when an
+    ``@path`` file is missing or unreadable.
+    """
+    if not value.startswith("@"):
+        return value
+    path = Path(value[1:])
+    try:
+        return path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        raise SystemExit(f"Error: {context} file not found: {path}")
+    except OSError as exc:
+        raise SystemExit(f"Error: could not read {context} file {path}: {exc}")
 
 
 def _build_resources(args) -> list:
@@ -108,8 +118,8 @@ def main():
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir) if args.output_dir else None
-    brief = _resolve_text(args.brief)
-    rubric = _resolve_text(args.rubric) if args.rubric else DEFAULT_RUBRIC
+    brief = _resolve_text(args.brief, "brief")
+    rubric = _resolve_text(args.rubric, "rubric") if args.rubric else DEFAULT_RUBRIC
     resources = _build_resources(args)
 
     cfg = load_global_config(args.config)
@@ -153,6 +163,8 @@ def main():
     print(f"\n=== Engagement outcome: {tracker.last_result} ===")
     if output_dir:
         print(f"Deliverables downloaded to {output_dir}")
+    if not tracker.satisfied:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

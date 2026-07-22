@@ -14,12 +14,17 @@ def _args(**kw):
 
 class TestResolveText:
     def test_literal_text(self):
-        assert _resolve_text("just a brief") == "just a brief"
+        assert _resolve_text("just a brief", "brief") == "just a brief"
 
     def test_reads_file_when_prefixed(self, tmp_path):
         f = tmp_path / "brief.md"
         f.write_text("brief from file")
-        assert _resolve_text(f"@{f}") == "brief from file"
+        assert _resolve_text(f"@{f}", "brief") == "brief from file"
+
+    def test_missing_file_raises_clean_systemexit(self, tmp_path):
+        missing = tmp_path / "nope.md"
+        with pytest.raises(SystemExit, match="brief file not found"):
+            _resolve_text(f"@{missing}", "brief")
 
 
 class TestBuildResources:

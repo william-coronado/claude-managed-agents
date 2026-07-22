@@ -12,15 +12,12 @@ See ``shared/managed-agents-environments.md`` -> "Session outputs":
     client.beta.files.download(file_id)
 """
 import logging
-import os
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+
+from src.constants import MANAGED_AGENTS_BETA
 
 logger = logging.getLogger(__name__)
-
-# The files.* resource auto-adds only the files-api beta header, so the
-# managed-agents beta must be passed explicitly for the scope_id filter.
-_MANAGED_AGENTS_BETA = "managed-agents-2026-04-01"
 
 
 def _iter_files(list_result):
@@ -45,7 +42,7 @@ def _list_session_files(client, session_id, retries, retry_delay):
     for attempt in range(retries + 1):
         result = client.beta.files.list(
             scope_id=session_id,
-            betas=[_MANAGED_AGENTS_BETA],
+            betas=[MANAGED_AGENTS_BETA],
         )
         files = _iter_files(result)
         if files or attempt == retries:
@@ -55,13 +52,27 @@ def _list_session_files(client, session_id, retries, retry_delay):
 
 
 def _safe_relpath(filename: str):
-    """Return a path-traversal-safe relative path, or None if it escapes."""
-    filename = (filename or "").lstrip("/")
+    """Return a path-traversal-safe relative path, or None if it escapes.
+
+    Intentionally strict and POSIX-only: rejects backslashes (Windows/UNC
+    separators), drive/anchor components (``C:foo``), leading separators, and
+    any ``..`` component, so behaviour is consistent regardless of host OS.
+    """
+    filename = (filename or "").strip()
     if not filename:
         return None
-    # Reject any component that would climb out of output_dir.
-    parts = [p for p in Path(filename).parts if p not in ("", ".")]
-    if not parts or ".." in parts or os.path.isabs(filename):
+    # Windows/UNC separators or mixed-separator paths are never valid here.
+    if "\\" in filename:
+        return None
+    # Parse as POSIX only, so a stray host-specific rule can't change semantics.
+    posix = PurePosixPath(filename)
+    if posix.is_absolute():  # leading "/" — reject rather than silently relativize
+        return None
+    parts = [p for p in posix.parts if p not in ("", ".")]
+    if not parts or ".." in parts:
+        return None
+    # Reject drive/anchor components (e.g. "C:foo", "C:/bar").
+    if ":" in parts[0]:
         return None
     return Path(*parts)
 

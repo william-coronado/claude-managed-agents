@@ -100,5 +100,10 @@ def run_outcome_session(
     if output_dir is not None:
         download_session_outputs(client, session.id, output_dir)
 
-    logger.info("Outcome finished with result: %s", tracker.last_result)
+    if tracker.satisfied:
+        logger.info("Outcome satisfied")
+    elif tracker.last_result is not None:
+        logger.warning("Outcome did not pass — final grade: %s", tracker.last_result)
+    else:
+        logger.warning("Outcome ended without a grader result")
     return tracker

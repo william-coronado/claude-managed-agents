@@ -3,7 +3,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from src.outputs import download_session_outputs, _MANAGED_AGENTS_BETA
+import pytest
+
+from src.constants import MANAGED_AGENTS_BETA
+from src.outputs import download_session_outputs
 
 
 def _file(id_, filename):
@@ -43,7 +46,7 @@ class TestDownloadSessionOutputs:
 
         assert count == 2
         client.beta.files.list.assert_called_once_with(
-            scope_id="sess-1", betas=[_MANAGED_AGENTS_BETA]
+            scope_id="sess-1", betas=[MANAGED_AGENTS_BETA]
         )
         assert (tmp_path / "result.py").read_text() == "print('ok')"
         assert (tmp_path / "report.md").read_text() == "# Report"
@@ -65,15 +68,32 @@ class TestDownloadSessionOutputs:
 
         assert (tmp_path / "chart.png").read_bytes() == b"\x89PNG\r\n"
 
-    def test_skips_path_traversal_filenames(self, tmp_path):
-        files = [_file("f1", "../evil.txt"), _file("f2", "ok.txt")]
+    def test_accepts_plain_iterable_list_result(self, tmp_path):
+        # files.list may return a directly-iterable page with no `.data`.
+        client = MagicMock()
+        client.beta.files.list.return_value = [_file("f1", "plain.txt")]
+        client.beta.files.download.side_effect = lambda fid: _make_download("iter")
+
+        count = download_session_outputs(client, "sess-iter", tmp_path)
+
+        assert count == 1
+        assert (tmp_path / "plain.txt").read_text() == "iter"
+
+    @pytest.mark.parametrize(
+        "bad_name",
+        ["../evil.txt", "/etc/passwd", "dir/../escape.txt", "..\\evil.txt", "C:\\evil.txt"],
+    )
+    def test_skips_unsafe_filenames(self, tmp_path, bad_name):
+        files = [_file("f1", bad_name), _file("f2", "ok.txt")]
         client = _client_with(files, {"f1": "bad", "f2": "good"})
 
+        before = {p.name for p in tmp_path.parent.iterdir()}
         count = download_session_outputs(client, "sess-4", tmp_path)
 
         assert count == 1
         assert (tmp_path / "ok.txt").read_text() == "good"
-        assert not (tmp_path.parent / "evil.txt").exists()
+        # Nothing escaped into the parent directory.
+        assert {p.name for p in tmp_path.parent.iterdir()} == before
 
     def test_creates_output_dir_if_missing(self, tmp_path):
         new_dir = tmp_path / "nested" / "out"
