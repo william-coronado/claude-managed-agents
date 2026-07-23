@@ -86,6 +86,26 @@ def _safe_relpath(filename: str):
     return Path(*parts)
 
 
+def list_session_output_files(
+    client, session_id, retries: int = 3, retry_delay: float = 1.5
+) -> list[tuple[str, str]]:
+    """Return (file_id, filename) pairs for files an agent wrote during a session.
+
+    Reuses the same traversal guard as ``download_session_outputs`` so a
+    caller mounting these as resources in a later session never gets handed
+    an unsafe path.
+    """
+    files = _list_session_files(client, session_id, retries, retry_delay)
+    result: list[tuple[str, str]] = []
+    for f in files:
+        filename = getattr(f, "filename", None) or getattr(f, "id", "")
+        rel = _safe_relpath(str(filename))
+        if rel is None:
+            continue
+        result.append((f.id, str(rel)))
+    return result
+
+
 def _save_download(download, dest: Path) -> None:
     """Write a downloaded file object to dest, handling text/binary uniformly."""
     dest.parent.mkdir(parents=True, exist_ok=True)
