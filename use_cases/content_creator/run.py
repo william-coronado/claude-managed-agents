@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from anthropic import Anthropic
 from src.config_loader import load_global_config
 from src.loader import load_resources
-from src.pipeline import run_agent_step
+from src.pipeline import run_agent_step, UPLOADS_MOUNT_DIR
 
 USE_CASE_DIR = os.path.dirname(__file__)
 GLOBAL_CONFIG = os.path.join(USE_CASE_DIR, "..", "..", "config", "global.yaml")
@@ -47,30 +47,41 @@ def main():
             "Research this topic thoroughly. Gather facts, statistics, key developments, "
             "and notable sources. Produce a structured research brief."
         )
-        research_output = run_agent_step(client, agents, envs, "cc-researcher", "cc-env", research_prompt, output_dir)
+        research_step = run_agent_step(client, agents, envs, "cc-researcher", "cc-env", research_prompt, output_dir)
 
-        # Step 2: author — receives the research brief
+        # Step 2: author — receives the research brief (as text, and the
+        # researcher's own output files mounted into this session)
         author_prompt = (
             f"Topic: {args.topic}\n\n"
             "A researcher has compiled the following brief:\n\n"
-            f"{research_output}\n\n"
+            f"{research_step.text}\n\n"
             "Write a compelling, well-structured article based on the research."
         )
-        article_output = run_agent_step(client, agents, envs, "cc-author", "cc-env", author_prompt, output_dir)
+        author_step = run_agent_step(
+            client, agents, envs, "cc-author", "cc-env", author_prompt, output_dir,
+            resources=research_step.resources,
+        )
 
-        # Step 3: editor — receives the full article draft
+        # Step 3: editor — receives the full article draft (as text, and the
+        # author's draft.md mounted into this session, since each step is
+        # otherwise its own isolated session/container)
         editor_prompt = (
             f"Topic: {args.topic}\n\n"
             "The author has produced the following draft:\n\n"
-            f"{article_output}\n\n"
+            f"{author_step.text}\n\n"
+            "The draft is also mounted in this session's filesystem under "
+            f"{UPLOADS_MOUNT_DIR}/draft.md, if you'd rather work from the file directly.\n\n"
             "Edit and polish it: fix grammar, improve flow, and produce the final version "
             "(article.md and article.docx) in the outputs directory."
         )
-        final_output = run_agent_step(client, agents, envs, "cc-editor", "cc-env", editor_prompt, output_dir)
+        final_step = run_agent_step(
+            client, agents, envs, "cc-editor", "cc-env", editor_prompt, output_dir,
+            resources=author_step.resources,
+        )
         if output_dir:
             print(f"\n=== Final article saved under {output_dir / 'cc-editor'} ===")
         else:
-            print("\n=== Final article ===\n" + final_output)
+            print("\n=== Final article ===\n" + final_step.text)
     except (KeyError, RuntimeError) as e:
         raise SystemExit(f"Error: {e}") from e
 

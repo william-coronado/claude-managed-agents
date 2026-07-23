@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.constants import MANAGED_AGENTS_BETA
-from src.outputs import download_session_outputs
+from src.outputs import download_session_outputs, list_session_output_files
 
 
 def _file(id_, filename):
@@ -151,3 +151,25 @@ class TestDownloadSessionOutputs:
 
         assert count == 1
         assert (tmp_path / "f1").read_text(encoding="utf-8") == "data"
+
+
+class TestListSessionOutputFiles:
+    def test_returns_file_id_filename_pairs(self):
+        files = [_file("f1", "draft.md"), _file("f2", "notes.txt")]
+        client = _client_with(files, {})
+
+        result = list_session_output_files(client, "sess-1")
+
+        assert result == [("f1", "draft.md"), ("f2", "notes.txt")]
+
+    def test_skips_unsafe_filenames(self):
+        files = [_file("f1", "../evil.txt"), _file("f2", "ok.txt")]
+        client = _client_with(files, {})
+
+        result = list_session_output_files(client, "sess-1")
+
+        assert result == [("f2", "ok.txt")]
+
+    def test_returns_empty_list_when_no_files(self):
+        client = _client_with([], {})
+        assert list_session_output_files(client, "sess-1", retries=0) == []

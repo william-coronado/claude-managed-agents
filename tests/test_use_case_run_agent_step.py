@@ -39,10 +39,12 @@ class TestCCRunAgentStep:
         mock_session = _make_mock_session("sess-2")
 
         with patch("src.pipeline.create_session", return_value=mock_session) as mock_cs, \
-             patch("src.pipeline.stream_message", return_value="research output") as mock_sm:
+             patch("src.pipeline.stream_message", return_value="research output") as mock_sm, \
+             patch("src.pipeline.list_session_output_files", return_value=[]):
             result = run_agent_step(client, agents, envs, "cc-researcher", "cc-env", "research AI")
 
-        assert result == "research output"
+        assert result.text == "research output"
+        assert result.resources == []
         mock_cs.assert_called_once_with(client, "a2", "e2", title="research AI")
         mock_sm.assert_called_once_with(client, "sess-2", "research AI")
 
@@ -86,10 +88,11 @@ class TestRunAgentStepOutputCapture:
 
         with patch("src.pipeline.create_session", return_value=session), \
              patch("src.pipeline.stream_message", return_value="out") as mock_sm, \
-             patch("src.pipeline.download_session_outputs") as mock_dl:
+             patch("src.pipeline.download_session_outputs") as mock_dl, \
+             patch("src.pipeline.list_session_output_files", return_value=[]):
             result = run_agent_step(client, agents, envs, "my-agent", "my-env", "prompt", tmp_path)
 
-        assert result == "out"
+        assert result.text == "out"
         mock_sm.assert_called_once_with(client, "sess-dl", "prompt")
         mock_dl.assert_called_once_with(client, "sess-dl", tmp_path / "my-agent")
 
@@ -100,9 +103,66 @@ class TestRunAgentStepOutputCapture:
 
         with patch("src.pipeline.create_session", return_value=session), \
              patch("src.pipeline.stream_message", return_value="out") as mock_sm, \
-             patch("src.pipeline.download_session_outputs") as mock_dl:
+             patch("src.pipeline.download_session_outputs") as mock_dl, \
+             patch("src.pipeline.list_session_output_files", return_value=[]):
             result = run_agent_step(client, agents, envs, "my-agent", "my-env", "prompt")
 
-        assert result == "out"
+        assert result.text == "out"
         mock_sm.assert_called_once_with(client, "sess-nodl", "prompt")
         mock_dl.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Carrying a step's output files forward as the next step's session resources
+# ---------------------------------------------------------------------------
+
+class TestRunAgentStepResourceHandoff:
+    def _import(self):
+        from src.pipeline import run_agent_step
+        return run_agent_step
+
+    def _setup(self):
+        agents = {"my-agent": _make_mock_agent("agent-id")}
+        envs = {"my-env": _make_mock_env("env-id")}
+        return MagicMock(), agents, envs
+
+    def test_returns_output_files_as_mountable_resources(self):
+        run_agent_step = self._import()
+        client, agents, envs = self._setup()
+        session = _make_mock_session("sess-out")
+
+        with patch("src.pipeline.create_session", return_value=session), \
+             patch("src.pipeline.stream_message", return_value="draft text"), \
+             patch("src.pipeline.list_session_output_files", return_value=[("file_abc", "draft.md")]):
+            result = run_agent_step(client, agents, envs, "my-agent", "my-env", "prompt")
+
+        assert result.resources == [
+            {"type": "file", "file_id": "file_abc", "mount_path": "/mnt/session/uploads/draft.md"}
+        ]
+
+    def test_incoming_resources_forwarded_to_create_session(self):
+        run_agent_step = self._import()
+        client, agents, envs = self._setup()
+        session = _make_mock_session("sess-in")
+        incoming = [{"type": "file", "file_id": "file_abc", "mount_path": "/mnt/session/uploads/draft.md"}]
+
+        with patch("src.pipeline.create_session", return_value=session) as mock_cs, \
+             patch("src.pipeline.stream_message", return_value="edited"), \
+             patch("src.pipeline.list_session_output_files", return_value=[]):
+            run_agent_step(client, agents, envs, "my-agent", "my-env", "prompt", resources=incoming)
+
+        mock_cs.assert_called_once_with(
+            client, "agent-id", "env-id", title="prompt", resources=incoming,
+        )
+
+    def test_no_resources_kwarg_when_none_incoming(self):
+        run_agent_step = self._import()
+        client, agents, envs = self._setup()
+        session = _make_mock_session("sess-none")
+
+        with patch("src.pipeline.create_session", return_value=session) as mock_cs, \
+             patch("src.pipeline.stream_message", return_value="edited"), \
+             patch("src.pipeline.list_session_output_files", return_value=[]):
+            run_agent_step(client, agents, envs, "my-agent", "my-env", "prompt")
+
+        mock_cs.assert_called_once_with(client, "agent-id", "env-id", title="prompt")
