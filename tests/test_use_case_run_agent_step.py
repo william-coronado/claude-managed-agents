@@ -138,7 +138,7 @@ class TestRunAgentStepResourceHandoff:
 
         assert result.text == "draft text"
         assert result.resources == [
-            {"type": "file", "file_id": "file_abc", "mount_path": "/mnt/session/uploads/draft.md"}
+            {"type": "file", "file_id": "file_abc", "mount_path": "/draft.md"}
         ]
 
     def test_incoming_resources_forwarded_to_create_session(self):

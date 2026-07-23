@@ -65,7 +65,7 @@ def run_agent_step(
     if output_dir is not None:
         download_session_outputs(client, session.id, output_dir / agent_name)
     next_resources = [
-        {"type": "file", "file_id": file_id, "mount_path": f"{UPLOADS_MOUNT_DIR}/{filename}"}
+        {"type": "file", "file_id": file_id, "mount_path": f"/{filename}"}
         for file_id, filename in list_session_output_files(client, session.id)
     ]
     return StepResult(text=output, resources=next_resources)
