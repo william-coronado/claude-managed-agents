@@ -208,3 +208,4 @@ __marimo__/
 .claude/.__smb001F
 .DS_Store
 cc-outputs/
+.mcp.json
