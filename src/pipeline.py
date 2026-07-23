@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from anthropic import Anthropic
 
@@ -26,7 +26,7 @@ class StepResult:
     step's (otherwise separate) session container.
     """
     text: str
-    resources: list = field(default_factory=list)
+    resources: list[dict[str, Any]] = field(default_factory=list)
 
 
 def run_agent_step(
@@ -37,7 +37,7 @@ def run_agent_step(
     env_name: str,
     prompt: str,
     output_dir: Optional[Path] = None,
-    resources: Optional[list] = None,
+    resources: Optional[list[dict[str, Any]]] = None,
 ) -> StepResult:
     """Run one agent as its own session and return its text output plus its output files.
 
@@ -57,7 +57,7 @@ def run_agent_step(
     session = with_retries(
         lambda: create_session(
             client, agent.id, env.id, title=prompt[:80],
-            **({"resources": resources} if resources else {}),
+            **({"resources": resources} if resources is not None else {}),
         ),
         description="session create",
     )

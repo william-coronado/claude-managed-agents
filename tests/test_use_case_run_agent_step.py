@@ -136,6 +136,7 @@ class TestRunAgentStepResourceHandoff:
              patch("src.pipeline.list_session_output_files", return_value=[("file_abc", "draft.md")]):
             result = run_agent_step(client, agents, envs, "my-agent", "my-env", "prompt")
 
+        assert result.text == "draft text"
         assert result.resources == [
             {"type": "file", "file_id": "file_abc", "mount_path": "/mnt/session/uploads/draft.md"}
         ]
@@ -166,3 +167,18 @@ class TestRunAgentStepResourceHandoff:
             run_agent_step(client, agents, envs, "my-agent", "my-env", "prompt")
 
         mock_cs.assert_called_once_with(client, "agent-id", "env-id", title="prompt")
+
+    def test_explicit_empty_resources_list_still_forwarded(self):
+        # An explicit [] is distinct from "not specified" (None) — a caller
+        # that deliberately passes an empty list should have that reflected
+        # in the create_session call, not silently dropped via truthiness.
+        run_agent_step = self._import()
+        client, agents, envs = self._setup()
+        session = _make_mock_session("sess-empty")
+
+        with patch("src.pipeline.create_session", return_value=session) as mock_cs, \
+             patch("src.pipeline.stream_message", return_value="edited"), \
+             patch("src.pipeline.list_session_output_files", return_value=[]):
+            run_agent_step(client, agents, envs, "my-agent", "my-env", "prompt", resources=[])
+
+        mock_cs.assert_called_once_with(client, "agent-id", "env-id", title="prompt", resources=[])

@@ -173,3 +173,19 @@ class TestListSessionOutputFiles:
     def test_returns_empty_list_when_no_files(self):
         client = _client_with([], {})
         assert list_session_output_files(client, "sess-1", retries=0) == []
+
+    def test_falls_back_to_id_when_filename_missing(self):
+        files = [_file("f1", None)]
+        client = _client_with(files, {})
+
+        result = list_session_output_files(client, "sess-1")
+
+        assert result == [("f1", "f1")]
+
+    def test_unsafe_id_is_blocked_when_filename_missing(self):
+        files = [_file("../evil", None)]
+        client = _client_with(files, {})
+
+        result = list_session_output_files(client, "sess-1")
+
+        assert result == []
