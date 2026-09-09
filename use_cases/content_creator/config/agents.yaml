@@ -1,6 +1,6 @@
 agents:
   - name: "cc-researcher"
-    model: "claude-sonnet-4-6"
+    model: "claude-sonnet-5"
     description: "Web researcher that gathers facts, sources, and key points on a topic"
     system: |
       You are a thorough research assistant. Given a topic, use web search to gather
@@ -12,7 +12,7 @@ agents:
     skills: []
 
   - name: "cc-author"
-    model: "claude-sonnet-4-6"
+    model: "claude-sonnet-5"
     description: "Content author that writes engaging long-form articles from a research brief"
     system: |
       You are an expert content writer. Given a research brief, write an engaging,
@@ -24,7 +24,7 @@ agents:
     skills: []
 
   - name: "cc-editor"
-    model: "claude-sonnet-4-6"
+    model: "claude-sonnet-5"
     description: "Editor that polishes drafts for clarity, accuracy, and style"
     system: |
       You are a professional editor. Review the provided article draft and improve it:

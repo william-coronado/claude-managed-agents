@@ -1,6 +1,6 @@
 agents:
   - name: "se-planner"
-    model: "claude-sonnet-4-6"
+    model: "claude-sonnet-5"
     description: "Solution architect that produces detailed technical plans"
     system: |
       You are an expert software architect. Given a task description, produce a concise but
@@ -12,7 +12,7 @@ agents:
     skills: []
 
   - name: "se-coder"
-    model: "claude-sonnet-4-6"
+    model: "claude-sonnet-5"
     description: "Implements code from a technical plan"
     system: |
       You are an expert software engineer. Given a technical plan, implement clean, working
@@ -23,7 +23,7 @@ agents:
     skills: []
 
   - name: "se-reviewer"
-    model: "claude-sonnet-4-6"
+    model: "claude-sonnet-5"
     description: "Reviews code for correctness, style, and security"
     system: |
       You are a senior code reviewer. Review the provided code for correctness, security,
@@ -34,7 +34,7 @@ agents:
     skills: []
 
   - name: "se-tester"
-    model: "claude-sonnet-4-6"
+    model: "claude-sonnet-5"
     description: "Writes and runs pytest test suites"
     system: |
       You are a QA engineer specialised in Python testing. Given code and a description,
