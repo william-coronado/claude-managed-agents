@@ -174,6 +174,20 @@ class TestDownloadSessionOutputs:
         assert count == 1
         assert (tmp_path / "result.py").read_text(encoding="utf-8") == "print('ok')"
 
+    def test_falls_back_to_flat_files_api_listing_when_events_list_raises(self, tmp_path):
+        """A sessions-events outage must not take down output retrieval entirely -
+        it degrades to the flat basename-only behavior (no recovered paths),
+        which is what this module did before event replay was added."""
+        client = MagicMock()
+        client.beta.sessions.events.list.side_effect = RuntimeError("events API unavailable")
+        client.beta.files.list.return_value = SimpleNamespace(data=[_file("f1", "result.py")])
+        client.beta.files.download.side_effect = lambda fid: _make_download("print('ok')")
+
+        count = download_session_outputs(client, "sess-events-outage", tmp_path)
+
+        assert count == 1
+        assert (tmp_path / "result.py").read_text(encoding="utf-8") == "print('ok')"
+
     def test_handles_binary_content(self, tmp_path):
         files = [_file("f1", "chart.png")]
         client = _client_with(files, {"f1": b"\x89PNG\r\n"})
@@ -319,6 +333,15 @@ class TestListSessionOutputFiles:
         result = list_session_output_files(client, "sess-1")
 
         assert result == [("f1", "todo/main.py")]
+
+    def test_falls_back_to_flat_listing_when_events_list_raises(self):
+        client = MagicMock()
+        client.beta.sessions.events.list.side_effect = RuntimeError("events API unavailable")
+        client.beta.files.list.return_value = SimpleNamespace(data=[_file("f1", "draft.md")])
+
+        result = list_session_output_files(client, "sess-1")
+
+        assert result == [("f1", "draft.md")]
 
     def test_skips_ambiguous_duplicate_basenames(self):
         """Files that can't be safely correlated to a write call have no

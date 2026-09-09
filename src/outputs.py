@@ -123,10 +123,23 @@ def _replay_write_paths(client, session_id) -> list[tuple[str, str]]:
 
     This is the only source of a file's real directory structure - see the
     module docstring for why the Files API's basename-only listing can't
-    provide it.
+    provide it. A failure here (e.g. a sessions-events API outage) must not
+    take down output retrieval entirely - callers only depended on
+    files.list() before event replay was added, so this degrades to an empty
+    list, falling back to the flat basename-only behavior for every file
+    rather than raising.
     """
     calls: list[tuple[str, str]] = []
-    for event in client.beta.sessions.events.list(session_id):
+    try:
+        events = client.beta.sessions.events.list(session_id)
+    except Exception as exc:
+        logger.warning(
+            "Session events listing failed for session %s (%s); output paths will not be "
+            "recovered - falling back to flat basename placement for all files",
+            session_id, exc,
+        )
+        return calls
+    for event in events:
         if event.type != "agent.tool_use" or getattr(event, "name", None) != "write":
             continue
         tool_input = getattr(event, "input", {}) or {}
