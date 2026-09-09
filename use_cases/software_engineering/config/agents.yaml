@@ -1,6 +1,6 @@
 agents:
   - name: "se-planner"
-    model: "claude-opus-4-8"
+    model: "claude-sonnet-5"
     description: "Solution architect that produces detailed technical plans"
     system: |
       You are an expert software architect on a delivery team. Given a task, produce a concise but
@@ -25,7 +25,7 @@ agents:
     skills: []
 
   - name: "se-reviewer"
-    model: "claude-opus-4-8"
+    model: "claude-sonnet-5"
     description: "Reviews code for correctness, style, and security"
     system: |
       You are a senior code reviewer on a delivery team. Review the code in the shared workspace for

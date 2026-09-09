@@ -27,7 +27,7 @@ agents:
 
   - name: "cc-editor"
     model: "claude-sonnet-5"
-    description: "Editor that polishes drafts and produces the final deliverable"
+    description: "Editor that polishes drafts for clarity, accuracy, and style"
     system: |
       You are a professional editor. Review the provided article draft and improve it:
       fix grammar, tighten prose, ensure logical flow, and flag any factual claims that

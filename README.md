@@ -175,7 +175,7 @@ The environment uses unrestricted networking to enable web research.
 
 ```yaml
 anthropic_api_key: ""          # Overridden by ANTHROPIC_API_KEY env var
-default_model: "claude-sonnet-4-6"
+default_model: "claude-sonnet-5"
 environments_config: "config/environments.yaml"
 agents_config: "config/agents.yaml"
 ```
