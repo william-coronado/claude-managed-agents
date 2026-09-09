@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "d57fde82406c",
+  "strategy": "manual-commit",
+  "branch": "dev",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".gitignore",
+    ".mcp.json",
+    "src/downloads.py",
+    "tests/test_downloads.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/d5/7fde82406c/0/metadata.json",
+      "transcript": "/d5/7fde82406c/0/full.jsonl",
+      "compact_transcript": "/d5/7fde82406c/0/transcript.jsonl",
+      "content_hash": "/d5/7fde82406c/0/content_hash.txt",
+      "prompt": "/d5/7fde82406c/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 212,
+    "cache_creation_tokens": 231473,
+    "cache_read_tokens": 20350346,
+    "output_tokens": 74690,
+    "api_call_count": 106
+  }
+}
