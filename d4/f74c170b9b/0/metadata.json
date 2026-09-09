@@ -1,0 +1,87 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "d4f74c170b9b",
+  "session_id": "5800c607-3a53-41a6-afc3-00f091b3c658",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-09T15:19:05.070961Z",
+  "branch": "dev",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/outputs.py",
+    "tests/test_outputs.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5",
+  "turn_id": "2fd6ba7ad7f0",
+  "checkpoint_transcript_start": 1052,
+  "transcript_lines_at_start": 1052,
+  "compact_transcript_start": 167,
+  "token_usage": {
+    "input_tokens": 36,
+    "cache_creation_tokens": 14396,
+    "cache_read_tokens": 6548282,
+    "output_tokens": 8774,
+    "api_call_count": 18
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_011J9DoqwYhwvWu4PFY8iKXf",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "claude-api"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "12b513f7550b",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 31,
+        "end": 32,
+        "entry_ids": [
+          "90a17fdb-7091-46f2-84de-1ad6ff8a9bb4"
+        ],
+        "tool_use_id": "toolu_011J9DoqwYhwvWu4PFY8iKXf"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_011J9DoqwYhwvWu4PFY8iKXf"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: claude-api",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 9
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-09T15:19:04.997181Z",
+    "agent_lines": 38,
+    "agent_removed": 2,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 38,
+    "total_lines_changed": 40,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 11,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/settings.local.json": 11
+      }
+    }
+  ]
+}
