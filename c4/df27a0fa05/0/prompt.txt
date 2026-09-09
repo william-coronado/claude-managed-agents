@@ -1,0 +1,13 @@
+please review codebase and see if it requires updating to latest Claude Platform API, and if there any new feature from Claude Platform that would be benefitioal to implement
+
+---
+
+Implement #1, #2 and #3. I just set env variable ANTHROPIC_API_KEY outside this session so you can do real test
+
+---
+
+I just exit this ession, executed the export, and came back. You should be able to see ANTHROPIC_API_KEY populated now
+
+---
+
+archive test resources

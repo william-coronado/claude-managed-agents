@@ -1,0 +1,139 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "c4df27a0fa05",
+  "session_id": "5800c607-3a53-41a6-afc3-00f091b3c658",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-09T12:30:34.3594Z",
+  "branch": "dev",
+  "checkpoints_count": 6,
+  "save_step_count": 5,
+  "files_touched": [
+    ".mcp.json",
+    "CLAUDE.md",
+    "README.md",
+    "cc-outputs/cc-author/draft.md",
+    "cc-outputs/cc-editor/article.docx",
+    "cc-outputs/cc-editor/article.md",
+    "cc-outputs/cc-researcher/research-brief.md",
+    "config/agents.yaml",
+    "config/global.yaml",
+    "requirements.txt",
+    "src/downloads.py",
+    "tests/test_downloads.py",
+    "use_cases/content_creator/config/agents.yaml",
+    "use_cases/software_engineering/config/agents.yaml"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-5",
+  "turn_id": "12b513f7550b",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 164,
+    "cache_creation_tokens": 194396,
+    "cache_read_tokens": 14206928,
+    "output_tokens": 54642,
+    "api_call_count": 82
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_011J9DoqwYhwvWu4PFY8iKXf",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "claude-api"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "12b513f7550b",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 31,
+        "end": 32,
+        "entry_ids": [
+          "90a17fdb-7091-46f2-84de-1ad6ff8a9bb4"
+        ],
+        "tool_use_id": "toolu_011J9DoqwYhwvWu4PFY8iKXf"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_011J9DoqwYhwvWu4PFY8iKXf"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: claude-api",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 6
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-09T12:30:34.315614Z",
+    "agent_lines": 199,
+    "agent_removed": 27,
+    "human_added": 168,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 367,
+    "total_lines_changed": 394,
+    "agent_percentage": 57.360406091370564,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 458,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/settings.json": 84,
+        ".claude/settings.local.json": 11,
+        ".mcp.json": 8,
+        "cc-outputs/cc-author/draft.md": 89,
+        "cc-outputs/cc-editor/article.md": 86,
+        "cc-outputs/cc-researcher/research-brief.md": 180
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 95,
+      "user_lines_removed": 0,
+      "agent_lines_added": 375,
+      "agent_lines_removed": 12,
+      "user_added_per_file": {
+        ".claude/settings.json": 84,
+        ".claude/settings.local.json": 11
+      }
+    },
+    {
+      "checkpoint_number": 5,
+      "user_lines_added": 95,
+      "user_lines_removed": 0,
+      "agent_lines_added": 562,
+      "agent_lines_removed": 27,
+      "user_added_per_file": {
+        ".claude/settings.json": 84,
+        ".claude/settings.local.json": 11
+      }
+    }
+  ]
+}

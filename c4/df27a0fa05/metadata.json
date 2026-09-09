@@ -1,0 +1,39 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "c4df27a0fa05",
+  "strategy": "manual-commit",
+  "branch": "dev",
+  "checkpoints_count": 6,
+  "files_touched": [
+    ".mcp.json",
+    "CLAUDE.md",
+    "README.md",
+    "cc-outputs/cc-author/draft.md",
+    "cc-outputs/cc-editor/article.docx",
+    "cc-outputs/cc-editor/article.md",
+    "cc-outputs/cc-researcher/research-brief.md",
+    "config/agents.yaml",
+    "config/global.yaml",
+    "requirements.txt",
+    "src/downloads.py",
+    "tests/test_downloads.py",
+    "use_cases/content_creator/config/agents.yaml",
+    "use_cases/software_engineering/config/agents.yaml"
+  ],
+  "sessions": [
+    {
+      "metadata": "/c4/df27a0fa05/0/metadata.json",
+      "transcript": "/c4/df27a0fa05/0/full.jsonl",
+      "compact_transcript": "/c4/df27a0fa05/0/transcript.jsonl",
+      "content_hash": "/c4/df27a0fa05/0/content_hash.txt",
+      "prompt": "/c4/df27a0fa05/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 164,
+    "cache_creation_tokens": 194396,
+    "cache_read_tokens": 14206928,
+    "output_tokens": 54642,
+    "api_call_count": 82
+  }
+}
