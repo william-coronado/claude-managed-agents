@@ -18,6 +18,10 @@ class Agent:
     def name(self):
         return self._obj.name
 
+    @property
+    def version(self):
+        return getattr(self._obj, "version", None)
+
 
 def create_agent(client, config: AgentConfig, default_model: str, existing: bool = False) -> Agent:
     if existing:
@@ -34,7 +38,7 @@ def create_agent(client, config: AgentConfig, default_model: str, existing: bool
                     return Agent(agent)
         raise ResourceNotFoundError(f"Existing agent '{config.name}' not found")
     model = config.model or default_model
-    obj = client.beta.agents.create(
+    kwargs = dict(
         name=config.name,
         model=model,
         system=config.system,
@@ -43,4 +47,8 @@ def create_agent(client, config: AgentConfig, default_model: str, existing: bool
         skills=config.skills or [],
         description=config.description or None,
     )
+    # A coordinator agent declares a multiagent roster it may delegate to.
+    if config.multiagent:
+        kwargs["multiagent"] = config.multiagent
+    obj = client.beta.agents.create(**kwargs)
     return Agent(obj)
