@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "cli-tools": {
-      "command": "/Users/william/.venv_cli_tools/bin/python3",
-      "args": ["/Users/william/remote/dev/tools/cli_tools/mcp_server.py"]
-    }
-  }
-}
